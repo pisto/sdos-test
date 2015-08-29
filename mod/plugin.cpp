@@ -20,7 +20,6 @@
  ***********************************************************************/
 
 #include "cube.h"
-#include <dlfcn.h>
 
 namespace mod {
 namespace plugin {
@@ -256,12 +255,12 @@ void slice()
 //
 
 plugin_t::plugin_t(const char *name, const char *file) :
-    name(name), handle(dlopen(file, RTLD_LAZY)),
+    name(name), handle(SDL_LoadObject(file)),
     unload(NULL), slice(), command(), commandnames() {}
 
 plugin_t::~plugin_t()
 {
-    if (handle) dlclose(handle);
+    if (handle) SDL_UnloadObject(handle);
 }
 
 strtool plugin_t::versionstr()
@@ -273,13 +272,13 @@ strtool plugin_t::versionstr()
 
 void *plugin_t::dlsym(const char *name)
 {
-    return ::dlsym(handle, name);
+    return SDL_LoadFunction(handle, name);
 }
 
 strtool plugin_t::dlerror()
 {
     strtool s;
-    s << "dlerror(): " << ::dlerror();
+    s << "dlerror(): " << SDL_GetError();
     return s;
 }
 
