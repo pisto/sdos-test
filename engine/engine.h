@@ -266,10 +266,9 @@ extern void resetqueries();
 extern int getnumqueries();
 extern void drawbb(const ivec &bo, const ivec &br, const vec &camera = camera1->o);
 
-#define startquery(query) { holdscreenlock; glBeginQuery_(GL_SAMPLES_PASSED_ARB, ((occludequery *)(query))->id); }
+#define startquery(query) { glBeginQuery_(GL_SAMPLES_PASSED_ARB, ((occludequery *)(query))->id); }
 #define endquery(query) \
     { \
-        holdscreenlock;\
         glEndQuery_(GL_SAMPLES_PASSED_ARB); \
         extern int ati_oq_bug; \
         if(ati_oq_bug) glFlush(); \
@@ -418,8 +417,7 @@ extern float loadprogress;
 extern void renderbackground(const char *caption = NULL, Texture *mapshot = NULL, const char *mapname = NULL, const char *mapinfo = NULL, bool restore = false, bool force = false);
 extern void renderprogress(float bar, const char *text, GLuint tex = 0, bool background = false);
 
-enum { FPS = 0, MISSFPS, RESYNCS, VSYNCLAG, TOTLAG, NUMFPS };
-extern int getfps(int which);
+extern void getfps(int &fps, int &bestdiff, int &worstdiff);
 extern void swapbuffers(bool overlay = true);
 extern int getclockmillis();
 

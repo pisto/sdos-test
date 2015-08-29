@@ -46,7 +46,6 @@ static void inithemisphere(int hres, int depth)
 
     if(hasVBO)
     {
-        holdscreenlock;
         if(renderpath!=R_FIXEDFUNCTION)
         {
             if(!hemivbuf) glGenBuffers_(1, &hemivbuf);
@@ -77,7 +76,6 @@ static GLuint createexpmodtex(int size, float minval)
         *dst++ = uchar(max(z, minval)*255);
     }
     GLuint tex = 0;
-    holdscreenlock;
     glGenTextures(1, &tex);
     createtexture(tex, size, size, data, 3, 2, GL_ALPHA);
     delete[] data;
@@ -96,7 +94,7 @@ static void animateexplosion()
     static int lastexpmillis = 0;
     if(expverts && lastexpmillis == lastmillis)
     {
-        if(hasVBO){ holdscreenlock; glBindBuffer_(GL_ARRAY_BUFFER_ARB, expvbuf); }
+        if(hasVBO) glBindBuffer_(GL_ARRAY_BUFFER_ARB, expvbuf);
         return;
     }
     lastexpmillis = lastmillis;
@@ -121,7 +119,6 @@ static void animateexplosion()
 
     if(hasVBO)
     {
-        holdscreenlock;
         if(!expvbuf) glGenBuffers_(1, &expvbuf);
         glBindBuffer_(GL_ARRAY_BUFFER_ARB, expvbuf);
         glBufferData_(GL_ARRAY_BUFFER_ARB, heminumverts*sizeof(expvert), expverts, GL_STREAM_DRAW_ARB);
@@ -184,7 +181,6 @@ static void initsphere(int slices, int stacks)
 
     if(hasVBO)
     {
-        holdscreenlock;
         if(!spherevbuf) glGenBuffers_(1, &spherevbuf);
         glBindBuffer_(GL_ARRAY_BUFFER_ARB, spherevbuf);
         glBufferData_(GL_ARRAY_BUFFER_ARB, spherenumverts*sizeof(spherevert), sphereverts, GL_STATIC_DRAW_ARB);
@@ -238,7 +234,6 @@ static void setupexplosion()
 
     if(renderpath==R_FIXEDFUNCTION || explosion2d)
     {
-        holdscreenlock;
         if(!hemiverts && !hemivbuf) inithemisphere(5, 2);
         if(renderpath==R_FIXEDFUNCTION) animateexplosion();
         if(hasVBO)
@@ -293,7 +288,6 @@ static void setupexplosion()
 
 static void drawexpverts(int numverts, int numindices, GLushort *indices)
 {
-    holdscreenlock;
     if(hasDRE) glDrawRangeElements_(GL_TRIANGLES, 0, numverts-1, numindices, GL_UNSIGNED_SHORT, indices);
     else glDrawElements(GL_TRIANGLES, numindices, GL_UNSIGNED_SHORT, indices);
     xtraverts += numindices;
@@ -302,7 +296,6 @@ static void drawexpverts(int numverts, int numindices, GLushort *indices)
 
 static void drawexplosion(bool inside, uchar r, uchar g, uchar b, uchar a)
 {
-    holdscreenlock;
     if((renderpath!=R_FIXEDFUNCTION || maxtmus>=2) && lastexpmodtex != expmodtex[inside ? 1 : 0])
     {
         glActiveTexture_(GL_TEXTURE1_ARB);
@@ -348,7 +341,6 @@ static void drawexplosion(bool inside, uchar r, uchar g, uchar b, uchar a)
 
 static void cleanupexplosion()
 {
-   holdscreenlock;
     glDisableClientState(GL_VERTEX_ARRAY);
     if(renderpath==R_FIXEDFUNCTION)
     {
@@ -383,7 +375,6 @@ static void cleanupexplosion()
 
 static void deleteexplosions()
 {
-    holdscreenlock;
     loopi(2) if(expmodtex[i]) { glDeleteTextures(1, &expmodtex[i]); expmodtex[i] = 0; }
     if(hemivbuf) { glDeleteBuffers_(1, &hemivbuf); hemivbuf = 0; }
     if(hemiebuf) { glDeleteBuffers_(1, &hemiebuf); hemiebuf = 0; }
@@ -492,7 +483,6 @@ struct fireballrenderer : listrenderer
 
         if(isfoggedsphere(psize*WOBBLE, p->o)) return;
 
-        holdscreenlock;
         glPushMatrix();
         glTranslatef(o.x, o.y, o.z);
 

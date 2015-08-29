@@ -1,6 +1,5 @@
 // rendergl.cpp: core opengl rendering stuff
 
-#include <sched.h>
 #include "engine.h"
 
 bool hasVBO = false, hasDRE = false, hasOQ = false, hasTR = false, hasFBO = false, hasDS = false, hasTF = false, hasBE = false, hasBC = false, hasCM = false, hasNP2 = false, hasTC = false, hasS3TC = false, hasFXT1 = false, hasTE = false, hasMT = false, hasD3 = false, hasAF = false, hasVP2 = false, hasVP3 = false, hasPP = false, hasMDA = false, hasTE3 = false, hasTE4 = false, hasVP = false, hasFP = false, hasGLSL = false, hasGM = false, hasNVFB = false, hasSGIDT = false, hasSGISH = false, hasDT = false, hasSH = false, hasNVPCF = false, hasRN = false, hasPBO = false, hasFBB = false, hasUBO = false, hasBUE = false, hasMBR = false, hasFC = false, hasTEX = false;
@@ -180,8 +179,6 @@ VAR(usetexcompress, 1, 0, 0);
 VAR(rtscissor, 0, 1, 1);
 VAR(blurtile, 0, 1, 1);
 VAR(rtsharefb, 0, 1, 1);
-VAR(vsync, 0, 1, 2);
-extern int maxfps;
 
 static bool checkseries(const char *s, int low, int high)
 {
@@ -206,7 +203,6 @@ bool hasext(const char *exts, const char *ext)
 
 void gl_checkextensions()
 {
-    holdscreenlock;
     const char *vendor = (const char *)glGetString(GL_VENDOR);
     const char *exts = (const char *)glGetString(GL_EXTENSIONS);
     const char *renderer = (const char *)glGetString(GL_RENDERER);
@@ -515,7 +511,7 @@ void gl_checkextensions()
 #endif
 #ifdef WIN32
             intel_immediate_bug = 1;
-            //intel_vertexarray_bug = 1;
+            intel_vertexarray_bug = 1;
 #endif
         }
 
@@ -752,7 +748,6 @@ void gl_checkextensions()
 
 void glext(char *ext)
 {
-    holdscreenlock;
     const char *exts = (const char *)glGetString(GL_EXTENSIONS);
     intret(hasext(exts, ext) ? 1 : 0);
 }
@@ -760,13 +755,11 @@ COMMAND(glext, "s");
 
 void gl_resize()
 {
-    holdscreenlock;
     glViewport(0, 0, screenw, screenh);
 }
  
 void gl_init(int depth, int fsaa)
 {
-    holdscreenlock;
     gl_resize();
     glClearColor(0, 0, 0, 0);
     glClearDepth(1);
@@ -862,7 +855,6 @@ void findorientation()
 void transplayer()
 {
     // move from RH to Z-up LH quake style worldspace
-    holdscreenlock;
     glLoadMatrixf(viewmatrix.v);
 
     glRotatef(camera1->roll, 0, 1, 0);
@@ -894,7 +886,6 @@ void disablezoom()
 
 void computezoom()
 {
-    emulateelapsedtime;
     if(!zoom) { zoomprogress = 0; curfov = fov; curavatarfov = avatarfov; return; }
     if(zoom > 0) zoomprogress = zoominvel ? min(zoomprogress + float(elapsedtime) / zoominvel, 1.0f) : 1;
     else
@@ -949,7 +940,6 @@ void mousemove(int dx, int dy)
             curaccel = zoomaccel;
         }
     }
-    emulateelapsedtime;
     if(curaccel && (dx || dy)) cursens += curaccel * sqrtf(dx*dx + dy*dy)/max(elapsedtime, 1);
     cursens /= 33.0f*sensitivityscale/sdl2_sensitivity_adjust;
     camera1->yaw += dx*cursens;
@@ -1032,7 +1022,6 @@ glmatrixf mvmatrix, projmatrix, mvpmatrix, invmvmatrix, invmvpmatrix;
 
 void readmatrices()
 {
-    holdscreenlock;
     glGetFloatv(GL_MODELVIEW_MATRIX, mvmatrix.v);
     glGetFloatv(GL_PROJECTION_MATRIX, projmatrix.v);
 
@@ -1045,7 +1034,6 @@ FVAR(nearplane, 0.01f, 0.54f, 2.0f);
 
 void project(float fovy, float aspect, int farplane, bool flipx = false, bool flipy = false, bool swapxy = false, float zscale = 1)
 {
-    holdscreenlock;
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     if(swapxy) glRotatef(90, 0, 0, 1);
@@ -1080,7 +1068,6 @@ static const glmatrixf dummymatrix;
 static int projectioncount = 0;
 void pushprojection(const glmatrixf &m = dummymatrix)
 {
-    holdscreenlock;
     glMatrixMode(GL_PROJECTION);
     if(projectioncount <= 0) glPushMatrix();
     if(&m != &dummymatrix) glLoadMatrixf(m.v);
@@ -1096,7 +1083,6 @@ void pushprojection(const glmatrixf &m = dummymatrix)
 void popprojection()
 {
     --projectioncount;
-    holdscreenlock;
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();
     if(projectioncount > 0)
@@ -1117,7 +1103,6 @@ FVAR(depthoffset, -1e4f, 0.01f, 1e4f);
 
 void enablepolygonoffset(GLenum type)
 {
-    holdscreenlock;
     if(!depthoffset)
     {
         glPolygonOffset(polygonoffsetfactor, polygonoffsetunits);
@@ -1143,7 +1128,6 @@ void enablepolygonoffset(GLenum type)
 
 void disablepolygonoffset(GLenum type)
 {
-    holdscreenlock;
     if(!depthoffset)
     {
         glDisable(type);
@@ -1220,7 +1204,6 @@ int pushscissor(float sx1, float sy1, float sx2, float sy2)
     sy2 = min(sy2, 1.0f);
 
     GLint viewport[4];
-    holdscreenlock;
     glGetIntegerv(GL_VIEWPORT, viewport);
     int sx = viewport[0] + int(floor((sx1+1)*0.5f*viewport[2])),
         sy = viewport[1] + int(floor((sy1+1)*0.5f*viewport[3])),
@@ -1250,7 +1233,6 @@ int pushscissor(float sx1, float sy1, float sx2, float sy2)
 
 void popscissor()
 {
-    holdscreenlock;
     if(scissoring>1) glScissor(oldscissor[0], oldscissor[1], oldscissor[2], oldscissor[3]);
     else if(scissoring) glDisable(GL_SCISSOR_TEST);
     scissoring = 0;
@@ -1332,7 +1314,6 @@ static void setfog(int fogmat, float below = 1, int abovemat = MAT_AIR)
     blendfog(fogmat, below, logblend, start, end, fogc);
     if(below < 1) blendfog(abovemat, 1-below, 1-logblend, start, end, fogc);
 
-    holdscreenlock;
     glFogf(GL_FOG_START, start);
     glFogf(GL_FOG_END, end);
     glFogfv(GL_FOG_COLOR, fogc);
@@ -1369,7 +1350,6 @@ static void blendfogoverlay(int fogmat, float blend, float *overlay)
 void drawfogoverlay(int fogmat, float fogblend, int abovemat)
 {
     notextureshader->set();
-    holdscreenlock;
     glDisable(GL_TEXTURE_2D);
 
     glEnable(GL_BLEND);
@@ -1421,7 +1401,6 @@ void drawglare()
     refracting = -1;
 
     float oldfogstart, oldfogend, oldfogcolor[4], zerofog[4] = { 0, 0, 0, 1 };
-    holdscreenlock;
     glGetFloatv(GL_FOG_START, &oldfogstart);
     glGetFloatv(GL_FOG_END, &oldfogend);
     glGetFloatv(GL_FOG_COLOR, oldfogcolor);
@@ -1475,7 +1454,6 @@ void drawreflection(float z, bool refract, int fogdepth, const bvec &col)
     refractcolor = fogging ? col : fogcolor;
 
     float oldfogstart, oldfogend, oldfogcolor[4];
-    holdscreenlock;
     glGetFloatv(GL_FOG_START, &oldfogstart);
     glGetFloatv(GL_FOG_END, &oldfogend);
     glGetFloatv(GL_FOG_COLOR, oldfogcolor);
@@ -1648,7 +1626,6 @@ void drawcubemap(int size, const vec &o, float yaw, float pitch, const cubemapsi
 
     setfog(fogmat);
 
-    holdscreenlock;
     glClear(GL_DEPTH_BUFFER_BIT);
 
     int farplane = worldsize*2;
@@ -1718,7 +1695,6 @@ namespace modelpreview
         camera.roll = 0;
         camera1 = &camera;
 
-        holdscreenlock;
         glGetFloatv(GL_FOG_START, &oldfogstart);
         glGetFloatv(GL_FOG_END, &oldfogend);
         glGetFloatv(GL_FOG_COLOR, oldfogcolor);
@@ -1747,7 +1723,6 @@ namespace modelpreview
 
     void end()
     {
-        holdscreenlock;
         glDisable(GL_CULL_FACE);
         glDisable(GL_DEPTH_TEST);
 
@@ -1775,7 +1750,7 @@ vec minimapcenter(0, 0, 0), minimapradius(0, 0, 0), minimapscale(0, 0, 0);
 
 void clearminimap()
 {
-    if(minimaptex) { holdscreenlock; glDeleteTextures(1, &minimaptex); minimaptex = 0; }
+    if(minimaptex) { glDeleteTextures(1, &minimaptex); minimaptex = 0; }
 }
 
 VARR(minimapheight, 0, 0, 2<<16);
@@ -1789,7 +1764,6 @@ VARFP(minimapsize, 7, 8, 10, { if(minimaptex) drawminimap(); });
 
 void bindminimap()
 {
-    holdscreenlock;
     glBindTexture(GL_TEXTURE_2D, minimaptex);
 }
 
@@ -1815,7 +1789,6 @@ void drawminimap()
 
     int size = 1<<minimapsize, sizelimit = min(hwtexsize, min(screenw, screenh));
     while(size > sizelimit) size /= 2;
-    holdscreenlock;
     if(!minimaptex) glGenTextures(1, &minimaptex);
 
     extern vector<vtxarray *> valist;
@@ -1942,7 +1915,7 @@ int motionw = 0, motionh = 0, lastmotion = 0;
 
 void cleanupmotionblur()
 {
-    if(motiontex) { holdscreenlock; glDeleteTextures(1, &motiontex); motiontex = 0; }
+    if(motiontex) { glDeleteTextures(1, &motiontex); motiontex = 0; }
     motionw = motionh = 0;
     lastmotion = 0;
 }
@@ -1957,7 +1930,6 @@ void addmotionblur()
 
     if(game::ispaused()) { lastmotion = 0; return; }
 
-    holdscreenlock;
     if(!motiontex || motionw != screenw || motionh != screenh)
     {
         if(!motiontex) glGenTextures(1, &motiontex);
@@ -2061,7 +2033,6 @@ void gl_drawframe()
     findorientation();
     setenvmatrix();
 
-    holdscreenlock;
     glEnable(GL_FOG);
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
@@ -2160,7 +2131,6 @@ void gl_drawmainmenu()
     renderbackground(NULL, NULL, NULL, NULL, true, true);
     renderpostfx();
     
-    holdscreenlock;
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     glMatrixMode(GL_MODELVIEW);
@@ -2204,8 +2174,6 @@ void drawdamagecompass(int w, int h)
 {
     int dirs = 0;
     float size = damagecompasssize/100.0f*min(h, w)/2.0f;
-    holdscreenlock;
-    emulatecurtime;
     loopi(8) if(dcompass[i]>0)
     {
         if(!dirs)
@@ -2257,7 +2225,6 @@ void drawdamagescreen(int w, int h)
     if(lastmillis >= damageblendmillis) return;
 
     defaultshader->set();
-    holdscreenlock;
     glEnable(GL_TEXTURE_2D);
 
     static Texture *damagetex = NULL;
@@ -2358,7 +2325,6 @@ void drawcrosshair(int w, int h)
         }
         chsize = crosshairsize*w/900.0f;
     }
-    holdscreenlock;
     if(crosshair->type&Texture::ALPHA) glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     else glBlendFunc(GL_ONE, GL_ONE);
     glColor3f(r, g, b);
@@ -2391,7 +2357,6 @@ void gl_drawhud()
     int w = screenw, h = screenh;
     if(forceaspect) w = int(ceil(h*forceaspect));
 
-    holdscreenlock;
     if(editmode && !hidehud && !mainmenu)
     {
         glEnable(GL_DEPTH_TEST);
@@ -2458,19 +2423,17 @@ void gl_drawhud()
             int roffset = 0;
             if(showfps)
             {
-                int totlag = getfps(TOTLAG)/100;
-                if(vsync == 2)
+                static int lastfps = 0, prevfps[3] = { 0, 0, 0 }, curfps[3] = { 0, 0, 0 };
+                if(totalmillis - lastfps >= statrate)
                 {
-                    int vsynclag = getfps(VSYNCLAG)/100;
-                    draw_textf("fps %d lag %d.%d(%d.%d) late %d(%d)", conw-15*FONTH, conh-FONTH*3/2, getfps(FPS), totlag/10, totlag%10, vsynclag/10, vsynclag%10, getfps(RESYNCS), getfps(MISSFPS));
+                    memcpy(prevfps, curfps, sizeof(prevfps));
+                    lastfps = totalmillis - (totalmillis%statrate);
                 }
-                else if(vsync == 1) draw_textf("fps %d lag %d.%d", conw-9*FONTH, conh-FONTH*3/2, getfps(FPS), totlag/10, totlag%10);
-                else
-                {
-                    SDL_DisplayMode current;
-                    SDL_GetCurrentDisplayMode(SDL_GetWindowDisplayIndex(screen), &current);
-                    draw_textf("fps %d (%d Hz)", conw-9*FONTH, conh-FONTH*3/2, getfps(FPS), current.refresh_rate);
-                }
+                int nextfps[3];
+                getfps(nextfps[0], nextfps[1], nextfps[2]);
+                loopi(3) if(prevfps[i]==curfps[i]) curfps[i] = nextfps[i];
+                if(showfpsrange) draw_textf("fps %d+%d-%d", conw-7*FONTH, conh-FONTH*3/2, curfps[0], curfps[1], curfps[2]);
+                else draw_textf("fps %d", conw-5*FONTH, conh-FONTH*3/2, curfps[0]);
                 roffset += FONTH;
             }
 
@@ -2585,220 +2548,3 @@ void gl_drawhud()
 }
 
 
-
-extern SDL_GLContext glcontext;
-extern ullong tick();
-
-namespace drawer{
-
-XIDENT(IDF_SWLACC, VARP, jitvanticipate, 100000, 2000000, 15000000);
-
-namespace{
-
-enum drawerjob{ DRAWER_NONE, DRAWER_DRAW, DRAWER_ACQUIRE, DRAWER_RELEASE } job = DRAWER_NONE;
-SDL_mutex *screenmutex = NULL;
-SDL_atomic_t _wantdraw, missedsyncs, resyncs, vsynclag, totlag;
-SDL_sem *dojob, *donejob;
-SDL_threadID drawerID;
-int lockrecursion = 0;
-int lastrefreshrate = -1;
-ullong lastvsync = 0;
-int vsyncpredictframes = 1;
-
-ullong draw(bool mainthread = false){
-
-    bool sync, starving;
-    ullong start, drawend;
-
-    {
-        holdscreenlock;
-        gl_resize();
-        if(!mainthread) start = tick();
-
-        //drawing, was in engine/main.cpp
-        updateparticles();
-
-        inbetweenframes = false;
-        if(mainmenu) gl_drawmainmenu();
-        else gl_drawframe();
-
-        recorder::capture(true);
-        renderedframe = inbetweenframes = true;
-
-        if(mainthread){
-            SDL_GL_SetSwapInterval(0);
-            SDL_GL_SwapWindow(screen);
-            return 0;
-        }
-
-        //unblock the logic thread
-        job = DRAWER_NONE;
-        SDL_SemPost(donejob);
-
-        if(mainmenu){
-            SDL_GL_SetSwapInterval(1);
-            SDL_GL_SwapWindow(screen);
-            return 0;
-        }
-
-        //CPU to GPU syncing logic
-
-        //get current refresh, make sure our calculation is still valid
-        SDL_DisplayMode current;
-        SDL_GetCurrentDisplayMode(SDL_GetWindowDisplayIndex(screen), &current);
-        if(current.refresh_rate != lastrefreshrate){
-            lastrefreshrate = current.refresh_rate;
-            lastvsync = 0;
-        }
-        ullong frameinterval = 1000000000ULL / lastrefreshrate;
-
-        //block to measure real time spent drawing
-        glFinish();
-        drawend = tick();
-
-        //check if we are drawing frames too slowly
-        starving = drawend - start > frameinterval - 1000000ULL;
-        if(starving) lastvsync = 0;
-
-        sync = !lastvsync || drawend < lastvsync + vsyncpredictframes++ * frameinterval;
-        SDL_GL_SetSwapInterval(sync);
-        SDL_GL_SwapWindow(screen);
-        SDL_AtomicAdd(&missedsyncs, !sync);
-        glClear(GL_DEPTH_BUFFER_BIT);   //touch the next buffer to make sure we block until we can draw again (buffers effectively swapped)
-        glFinish();
-        if(starving) return 0;
-
-    }
-
-    //update vsync timestamp
-    ullong now = tick();
-    SDL_AtomicAdd(&totlag, (now - start)/1000);
-    SDL_AtomicAdd(&vsynclag, (now - drawend)/1000);
-    if(sync){
-        lastvsync = now;
-        vsyncpredictframes = 1;
-    }
-
-    if(vsync != 2) return 0;
-
-    //check for screw up, or sleep before signaling draw request
-    if(vsyncpredictframes > 3){
-        lastvsync = 0;
-        SDL_AtomicAdd(&resyncs, 1);
-        return 0;
-    }
-
-    //next vsync - allowance (0.5 ms) - draw time
-    ullong wakeup = lastvsync + vsyncpredictframes * (1000000000ULL / lastrefreshrate) - jitvanticipate - (drawend - start);
-    return wakeup > now ? wakeup - now : 0;
-
-}
-
-void dispatch_job(drawerjob j){
-    job = j;
-    SDL_SemPost(dojob);
-    SDL_SemWait(donejob);
-}
-
-int threadfunc(void *){
-    bool havecontext = false;
-    while(true){
-        if(vsync || mainmenu || minimized || !havecontext) SDL_SemWait(dojob);
-        else while(SDL_SemTryWait(dojob)) sched_yield();
-        if(job == DRAWER_DRAW){
-            SDL_AtomicSet(&_wantdraw, 0);
-            if(long wait = draw()){
-                timespec t{ .tv_sec = 0, .tv_nsec = wait };
-                nanosleep(&t, 0);
-            }
-            SDL_AtomicSet(&_wantdraw, 1);
-        }
-        else{
-            job == DRAWER_ACQUIRE ? SDL_GL_MakeCurrent(screen, glcontext) : SDL_GL_MakeCurrent(NULL, NULL);
-            havecontext = job == DRAWER_ACQUIRE;
-            job = DRAWER_NONE;
-            SDL_SemPost(donejob);
-        }
-    }
-    return 0;
-}
-
-void initializedrawer(){
-    screenmutex = SDL_CreateMutex();
-    SDL_AtomicSet(&_wantdraw, 1);
-    SDL_AtomicSet(&missedsyncs, 0);
-    SDL_AtomicSet(&resyncs, 0);
-    SDL_AtomicSet(&vsynclag, 0);
-    SDL_AtomicSet(&totlag, 0);
-    dojob = SDL_CreateSemaphore(0);
-    donejob = SDL_CreateSemaphore(0);
-    drawerID = SDL_GetThreadID(SDL_CreateThread(threadfunc, "drawer", NULL));
-}
-
-}
-
-XIDENT(IDF_SWLACC, VAR, nanodelay, 0, 50000, 999999);
-bool checkdraw(){
-    static drawer::lock* mainthreadlock = 0;
-    static ullong lastmaindraw = 0;
-    bool dodraw;
-    if(vsync || mainmenu){
-        DELETEP(mainthreadlock);
-        dodraw = SDL_AtomicGet(&_wantdraw);
-    }
-    else{
-        if(!mainthreadlock) mainthreadlock = new drawer::lock();
-        if(maxfps){
-            ullong period = 1000000000/maxfps;
-            ullong drawstart = tick();
-            if(drawstart > lastmaindraw + 2 * period){    //late
-                dodraw = true;
-                lastmaindraw = drawstart;
-            }
-            else if(drawstart < lastmaindraw + period) dodraw = false;     //early
-            else{      //in time, fake draw start so remainder is accounted for
-                lastmaindraw += period;
-                dodraw = true;
-            }
-        } else dodraw = true;
-    }
-
-    if(!dodraw){    //throttle main thread
-        if(mainmenu) SDL_Delay(1);
-        else if(nanodelay){
-            timespec t{ .tv_sec = 0, .tv_nsec = nanodelay };
-            nanosleep(&t, 0);
-        } else sched_yield();
-        return false;
-    }
-
-    if(!mainthreadlock) dispatch_job(DRAWER_DRAW);
-    else draw(true);
-    return true;
-
-}
-
-void stats(int& _missedsyncs, int& _resyncs, int& _vsynclag, int& _totlag){
-    _missedsyncs = SDL_AtomicSet(&missedsyncs, 0);
-    _resyncs = SDL_AtomicSet(&resyncs, 0);
-    _vsynclag = SDL_AtomicSet(&vsynclag, 0);
-    _totlag = SDL_AtomicSet(&totlag, 0);
-}
-
-lock::lock(){
-    if(!screenmutex) initializedrawer();
-    SDL_LockMutex(screenmutex);
-    if(lockrecursion++) return;
-    if(SDL_GetThreadID(NULL) != drawerID) dispatch_job(DRAWER_RELEASE);
-    SDL_GL_MakeCurrent(screen, glcontext);
-}
-
-lock::~lock(){
-    if(!--lockrecursion && SDL_GetThreadID(NULL) != drawerID){
-        SDL_GL_MakeCurrent(NULL, NULL);
-        dispatch_job(DRAWER_ACQUIRE);
-    }
-    SDL_UnlockMutex(screenmutex);
-}
-
-}

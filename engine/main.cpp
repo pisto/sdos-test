@@ -7,7 +7,6 @@ extern void cleargamma();
 
 void cleanup()
 {
-    holdscreenlock;
     recorder::stop();
     cleanupserver();
     SDL_ShowCursor(SDL_TRUE);
@@ -69,7 +68,7 @@ SDL_Window *screen = NULL;
 int screenw = 0, screenh = 0, desktopw = 0, desktoph = 0, winw = 0, winh = 0;
 SDL_GLContext glcontext = NULL;
 
-int lastmillis = 1, totalmillis = 1;
+int curtime = 0, lastmillis = 1, elapsedtime = 0, totalmillis = 1;
 
 dynent *player = NULL;
 
@@ -98,7 +97,7 @@ VARF(depthbits, 0, 0, 32, initwarning("depth-buffer precision"));
 VARF(stencilbits, 0, 0, 32, initwarning("stencil-buffer precision"));
 VARF(fsaa, -1, -1, 16, initwarning("anti-aliasing"));
 VARF(highdpi, 0, 1, 1, initwarning("screen resolution"));
-extern int vsync;
+VARF(vsync, 0, 0, 2, SDL_GL_SetSwapInterval(vsync == 2 ? -1 : vsync));
 
 void writeinitcfg()
 {
@@ -160,7 +159,6 @@ void renderbackground(const char *caption, Texture *mapshot, const char *mapname
     getbackgroundres(w, h);
     gettextres(w, h);
 
-    holdscreenlock;
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     glOrtho(0, w, h, 0, -1, 1);
@@ -352,7 +350,6 @@ void renderprogress(float bar, const char *text, GLuint tex, bool background)   
     getbackgroundres(w, h);
     gettextres(w, h);
 
-    holdscreenlock;
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
@@ -517,7 +514,6 @@ bool initwindowpos = false;
 
 void setfullscreen(bool enable)
 {
-    holdscreenlock;
     if(!screen) return;
     //initwarning(enable ? "fullscreen" : "windowed");
     SDL_SetWindowFullscreen(screen, enable ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
@@ -547,7 +543,6 @@ void screenres(int w, int h)
     {
         scr_w = min(scr_w, desktopw);
         scr_h = min(scr_h, desktoph);
-        holdscreenlock;
         if(SDL_GetWindowFlags(screen) & SDL_WINDOW_FULLSCREEN) gl_resize();
         else SDL_SetWindowSize(screen, scr_w, scr_h);
     }
@@ -564,20 +559,17 @@ VARFP(gamma, 30, 100, 300,
 {
     if(gamma == curgamma) return;
     curgamma = gamma;
-    holdscreenlock;
     if(SDL_SetWindowBrightness(screen, gamma/100.0f)==-1) conoutf(CON_ERROR, "Could not set gamma: %s", SDL_GetError());
 });
 
 void restoregamma()
 {
     if(curgamma == 100) return;
-    holdscreenlock;
     SDL_SetWindowBrightness(screen, curgamma/100.0f);
 }
 
 void cleargamma()
 {
-    holdscreenlock;
     if(curgamma != 100 && screen) SDL_SetWindowBrightness(screen, 1.0f);
 }
 
@@ -585,7 +577,6 @@ VAR(dbgmodes, 0, 0, 1);
 
 void setupscreen(int &useddepthbits, int &usedfsaa)
 {
-    holdscreenlock;
     if(glcontext)
     {
         SDL_GL_DeleteContext(glcontext);
@@ -669,6 +660,7 @@ void setupscreen(int &useddepthbits, int &usedfsaa)
     glcontext = SDL_GL_CreateContext(screen);
     if(!glcontext) fatal("failed to create OpenGL context: %s", SDL_GetError());
 
+    SDL_GL_SetSwapInterval(vsync == 2 ? -1 : vsync);
     SDL_GetWindowSize(screen, &winw, &winh);
     SDL_GL_GetDrawableSize(screen, &screenw, &screenh);
 
@@ -678,7 +670,6 @@ void setupscreen(int &useddepthbits, int &usedfsaa)
 
 void resetgl()
 {
-    holdscreenlock;
     clearchanges(CHANGE_GFX);
 
     renderbackground("resetting OpenGL");
@@ -950,7 +941,6 @@ void checkinput()
 
 void swapbuffers(bool overlay)
 {
-    holdscreenlock;
     recorder::capture(overlay);
     SDL_GL_SwapWindow(screen);
 }
@@ -958,26 +948,28 @@ void swapbuffers(bool overlay)
 VAR(menufps, 0, 60, 1000);
 VARP(maxfps, 0, 200, 1000);
 
-#ifdef __APPLE__
-
-#include <mach/mach_time.h>
-ullong tick(){
-        static mach_timebase_info_data_t tb;
-        if(!tb.denom) mach_timebase_info(&tb);
-        return (mach_absolute_time()*ullong(tb.numer))/tb.denom;
+void limitfps(int &millis, int curmillis)
+{
+    int limit = (mainmenu || minimized) && menufps ? (maxfps ? min(maxfps, menufps) : menufps) : maxfps;
+    if(!limit) return;
+    static int fpserror = 0;
+    int delay = 1000/limit - (millis-curmillis);
+    if(delay < 0) fpserror = 0;
+    else
+    {
+        fpserror += 1000%limit;
+        if(fpserror >= limit)
+        {
+            ++delay;
+            fpserror -= limit;
+        }
+        if(delay > 0)
+        {
+            SDL_Delay(delay);
+            millis += delay;
+        }
+    }
 }
-
-#define main SDL_main
-
-#else
-
-ullong tick(){
-    timespec t;
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    return t.tv_sec * 1000000000ULL + t.tv_nsec;
-}
-
-#endif
 
 #if defined(WIN32) && !defined(_DEBUG) && !defined(__GNUC__)
 void stackdumper(unsigned int type, EXCEPTION_POINTERS *ep)
@@ -1022,33 +1014,47 @@ void stackdumper(unsigned int type, EXCEPTION_POINTERS *ep)
 }
 #endif
 
-int currentfps[NUMFPS];
+#define MAXFPSHISTORY 60
 
-void updatefps(int which)
+int fpspos = 0, fpshistory[MAXFPSHISTORY];
+
+void resetfpshistory()
 {
-    static int fpsaccumulator[NUMFPS];
-    static int fpsbasemillis = 0;
-    if(totalmillis - fpsbasemillis >= 1000){
-        int frames = currentfps[FPS] = fpsaccumulator[FPS];
-        drawer::stats(currentfps[MISSFPS], currentfps[RESYNCS], currentfps[VSYNCLAG], currentfps[TOTLAG]);
-        currentfps[VSYNCLAG] /= (frames ? frames : 1), currentfps[TOTLAG] /= (frames ? frames : 1);
-        fpsaccumulator[FPS] = 0;
-        fpsbasemillis = totalmillis;
+    loopi(MAXFPSHISTORY) fpshistory[i] = 1;
+    fpspos = 0;
+}
+
+void updatefpshistory(int millis)
+{
+    fpshistory[fpspos++] = max(1, min(1000, millis));
+    if(fpspos>=MAXFPSHISTORY) fpspos = 0;
+}
+
+void getfps(int &fps, int &bestdiff, int &worstdiff)
+{
+    int total = fpshistory[MAXFPSHISTORY-1], best = total, worst = total;
+    loopi(MAXFPSHISTORY-1)
+    {
+        int millis = fpshistory[i];
+        total += millis;
+        if(millis < best) best = millis;
+        if(millis > worst) worst = millis;
     }
-    fpsaccumulator[which]++;
+
+    fps = (1000*MAXFPSHISTORY)/total;
+    bestdiff = 1000/best-fps;
+    worstdiff = fps-1000/worst;
 }
 
-int getfps(int which)
+void getfps_(int *raw)
 {
-    return currentfps[which];
+    int fps, bestdiff, worstdiff;
+    if(*raw) fps = 1000/fpshistory[(fpspos+MAXFPSHISTORY-1)%MAXFPSHISTORY];
+    else getfps(fps, bestdiff, worstdiff);
+    intret(fps);
 }
 
-void getfps_(int *raw, int *which)
-{
-    intret(getfps(clamp(*which, 0, NUMFPS - 1)));
-}
-
-COMMANDN(getfps, getfps_, "ii");
+COMMANDN(getfps, getfps_, "i");
 
 bool inbetweenframes = false, renderedframe = true;
 
@@ -1277,49 +1283,54 @@ int main(int argc, char **argv)
     logoutf("init: mainloop");
 
     initmumble();
+    resetfpshistory();
 
     inputgrab(grabinput = true);
     ignoremousemotion();
 
     conoutf(stringify_macro(\f0Sauerbraten Day of Sobriety Test Client\f2 v1.5.1));
 
-    ullong tick_last = tick();
-    double finelastmillis = lastmillis, finetotalmillis = totalmillis;
     for(;;)
     {
-        ullong tick_now = tick();
-        double elapsedmillis = double(tick_now - tick_last)/1000000;
-        tick_last = tick_now;
-        totalmillis = (finetotalmillis += elapsedmillis);
-        int oldlastmillis = lastmillis;
-        lastmillis = (finelastmillis += game::ispaused() ? 0 : game::scaletime(1) * elapsedmillis / 100);
-        bool lightupdate = oldlastmillis == lastmillis;
+        static int frames = 0;
+        int millis = getclockmillis();
+        limitfps(millis, totalmillis);
+        elapsedtime = millis - totalmillis;
+        static int timeerr = 0;
+        int scaledtime = game::scaletime(elapsedtime) + timeerr;
+        curtime = scaledtime/100;
+        timeerr = scaledtime%100;
+        if(!multiplayer(false) && curtime>200) curtime = 200;
+        if(game::ispaused()) curtime = 0;
+		lastmillis += curtime;
+        totalmillis = millis;
         updatetime();
  
         checkinput();
         menuprocess();
         tryedit();
 
-        game::updateworld();
+        if(lastmillis) game::updateworld();
 
-        if(!lightupdate) checksleep(lastmillis);
+        checksleep(lastmillis);
 
         serverslice(false, 0);
 
-        if(!lightupdate){
-            // miscellaneous general game effects
-            recomputecamera();
-            updatesounds();
-        }
+        if(frames) updatefpshistory(elapsedtime);
+        frames++;
 
-        if(minimized){
-            updateparticles();
-            SDL_Delay(1);
-            continue;
-        }
+        // miscellaneous general game effects
+        recomputecamera();
+        updateparticles();
+        updatesounds();
 
-        if(drawer::checkdraw()) updatefps(FPS);
+        if(minimized) continue;
 
+        inbetweenframes = false;
+        if(mainmenu) gl_drawmainmenu();
+        else gl_drawframe();
+        swapbuffers();
+        renderedframe = inbetweenframes = true;
     }
     
     ASSERT(0);   

@@ -994,7 +994,6 @@ void clearmapcrc() { mapcrc = 0; }
 
 bool load_world(const char *mname, const char *cname)        // still supports all map formats that have existed since the earliest cube betas!
 {
-    holdscreenlock;
     int loadingstart = SDL_GetTicks();
     setmapfilenames(mname, cname);
     stream *f = opengzfile(ogzname, "rb");

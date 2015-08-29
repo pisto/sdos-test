@@ -76,7 +76,7 @@ VERTWT(vertwtc, {
     varray::attrib<float>(v1+duv, v2+duv, v3+h);
 })
 VERTWN(vertwtcn, {
-    holdscreenlock; glColor4ub(wcol[0], wcol[1], wcol[2], 0x33);
+    glColor4ub(wcol[0], wcol[1], wcol[2], 0x33);
     varray::defattrib(varray::ATTRIB_TEXCOORD0, 3, GL_FLOAT);
 }, {
     varray::attrib<float>(v1, v2, v3+h);
@@ -91,7 +91,7 @@ VERTWT(vertwmtc, {
     varray::attrib<float>(v1+duv, v2+duv, v3+h);
 })
 VERTWN(vertwmtcn, {
-    holdscreenlock; glColor4ub(wcol[0], wcol[1], wcol[2], 0x33);
+    glColor4ub(wcol[0], wcol[1], wcol[2], 0x33);
     varray::defattrib(varray::ATTRIB_TEXCOORD0, 3, GL_FLOAT);
     varray::defattrib(varray::ATTRIB_TEXCOORD1, 3, GL_FLOAT);
 }, {
@@ -106,7 +106,7 @@ VERTWT(vertwetc, {
     varray::attrib<float>(v1+duv-camera1->o.x, v2+duv-camera1->o.y, camera1->o.z-(v3+h));
 })
 VERTWN(vertwetcn, {
-    holdscreenlock; glColor4ub(wcol[0], wcol[1], wcol[2], 0x33);
+    glColor4ub(wcol[0], wcol[1], wcol[2], 0x33);
     varray::defattrib(varray::ATTRIB_TEXCOORD0, 3, GL_FLOAT);
 }, {
     varray::attrib<float>(v1-camera1->o.x, v2-camera1->o.y, camera1->o.z-(v3+h));
@@ -121,7 +121,7 @@ VERTWT(vertwemtc, {
     varray::attrib<float>(v1+duv-camera1->o.x, v2+duv-camera1->o.y, camera1->o.z-(v3+h));
 })
 VERTWN(vertwemtcn, {
-    holdscreenlock; glColor4ub(wcol[0], wcol[1], wcol[2], 0x33);
+    glColor4ub(wcol[0], wcol[1], wcol[2], 0x33);
     varray::defattrib(varray::ATTRIB_TEXCOORD0, 3, GL_FLOAT);
     varray::defattrib(varray::ATTRIB_TEXCOORD1, 3, GL_FLOAT);
 }, {
@@ -380,7 +380,6 @@ void setprojtexmatrix(Reflection &ref)
         (ref.projmat = mvpmatrix).projective();
     }
     
-    holdscreenlock;
     glLoadMatrixf(ref.projmat.v);
 }
 
@@ -390,7 +389,6 @@ void setuprefractTMUs()
 
     if(waterreflect || (waterenvmap && hasCM))
     { 
-        holdscreenlock;
         glActiveTexture_(GL_TEXTURE1_ARB);
         glEnable(waterreflect ? GL_TEXTURE_2D : GL_TEXTURE_CUBE_MAP_ARB);
         if(!waterreflect) glBindTexture(GL_TEXTURE_CUBE_MAP_ARB, lookupenvmap(lookupmaterialslot(MAT_WATER)));
@@ -404,7 +402,6 @@ void setupreflectTMUs()
 {
     setuptmu(0, "T , K @ Ca", "Ka * C~a");
 
-    holdscreenlock;
     glDepthMask(GL_FALSE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_SRC_ALPHA);
@@ -421,7 +418,6 @@ void cleanupwaterTMUs(bool refract)
 {
     resettmu(0);
 
-    holdscreenlock;
     if(refract)
     {
         if(waterrefract || (waterenvmap && hasCM))
@@ -452,7 +448,6 @@ extern int oqfrags;
 
 void renderwaterff()
 {
-    holdscreenlock;
     glDisable(GL_CULL_FACE);
     
     if(minimapping) glDisable(GL_TEXTURE_2D);
@@ -607,7 +602,6 @@ void renderwater()
 
     if(renderpath==R_FIXEDFUNCTION) { renderwaterff(); return; }
 
-    holdscreenlock;
     glDisable(GL_CULL_FACE);
 
     glActiveTexture_(GL_TEXTURE1_ARB);
@@ -816,7 +810,6 @@ void renderwater()
 
 void setupwaterfallrefract(GLenum tmu1, GLenum tmu2)
 {
-    holdscreenlock;
     glActiveTexture_(tmu1);
     glBindTexture(GL_TEXTURE_2D, waterfallrefraction.refracttex ? waterfallrefraction.refracttex : notexture->id);
     glActiveTexture_(tmu2);
@@ -832,7 +825,6 @@ void cleanreflection(Reflection &ref)
     ref.init = false;
     ref.query = ref.prevquery = NULL;
     ref.matsurfs.setsize(0);
-    holdscreenlock;
     if(ref.tex)
     {
         glDeleteTextures(1, &ref.tex);
@@ -849,7 +841,6 @@ void cleanreflections()
 {
     loopi(MAXREFLECTIONS) cleanreflection(reflections[i]);
     cleanreflection(waterfallrefraction);
-    holdscreenlock;
     if(reflectionfb)
     {
         glDeleteFramebuffers_(1, &reflectionfb);
@@ -881,7 +872,6 @@ void genwatertex(GLuint &tex, GLuint &fb, GLuint &db, bool refract = false)
     if(!hasFBO) while(size>screenw || size>screenh) size /= 2;
     while(size>hwtexsize) size /= 2;
 
-    holdscreenlock;
     glGenTextures(1, &tex);
     char *buf = new char[size*size*4];
     memset(buf, 0, size*size*4);
@@ -1030,7 +1020,6 @@ void queryreflection(Reflection &ref, bool init)
     if(init)
     {
         nocolorshader->set();
-        holdscreenlock;
         glDepthMask(GL_FALSE);
         glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
         glDisable(GL_CULL_FACE);
@@ -1126,11 +1115,9 @@ void queryreflections()
 
     varray::disable();
 
-    holdscreenlock;
     if(refs)
     {
         defaultshader->set();
-        holdscreenlock;
         glDepthMask(GL_TRUE);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
         glEnable(GL_CULL_FACE);
@@ -1153,7 +1140,6 @@ void maskreflection(Reflection &ref, float offset, bool reflect, bool clear = fa
     const bvec &wcol = getwatercolor(ref.material);
     float fogc[4] = { wcol[0]/255.0f, wcol[1]/255.0f, wcol[2]/255.0f, 1.0f };
     bool inside = ref.height < INT_MAX && !hasFBO && vertwater && fabs(ref.height + offset - camera1->o.z) <= WATER_AMPLITUDE;
-    holdscreenlock;
     if(!maskreflect || inside)
     {
         if(clear || inside) glClearColor(fogc[0], fogc[1], fogc[2], fogc[3]);
@@ -1289,7 +1275,6 @@ void drawreflections()
     if(!hasFBO) while(size>screenw || size>screenh) size /= 2;
     while(size>hwtexsize) size /= 2;
 
-    holdscreenlock;
     if(waterreflect || waterrefract) loopi(MAXREFLECTIONS)
     {
         Reflection &ref = reflections[++n%MAXREFLECTIONS];

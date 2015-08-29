@@ -183,7 +183,7 @@ namespace ai
         else if(d->ai) destroy(d);
     }
 
-    void update(int curtime)
+    void update()
     {
         if(intermission) { loopv(players) if(players[i]->ai) players[i]->stopmoving(); }
         else // fixed rate logic done out-of-sequence at 1 frame per second for each ai
@@ -200,7 +200,7 @@ namespace ai
                 itermillis = totalmillis;
             }
             int count = 0;
-            loopv(players) if(players[i]->ai) think(players[i], ++count == iteration ? true : false, curtime);
+            loopv(players) if(players[i]->ai) think(players[i], ++count == iteration ? true : false);
             if(++iteration > count) iteration = 0;
         }
     }
@@ -1224,7 +1224,7 @@ namespace ai
         }
 	}
 
-    void logic(fpsent *d, aistate &b, bool run, int curtime)
+    void logic(fpsent *d, aistate &b, bool run)
     {
         bool allowmove = canmove(d) && b.type != AI_S_WAIT;
         if(d->state != CS_ALIVE || !allowmove) d->stopmoving();
@@ -1273,7 +1273,7 @@ namespace ai
 		avoidweapons(obstacles, guessradius);
     }
 
-    void think(fpsent *d, bool run, int curtime)
+    void think(fpsent *d, bool run)
     {
         // the state stack works like a chain of commands, certain commands simply replace each other
         // others spawn new commands to the stack the ai reads the top command from the stack and executes
@@ -1289,7 +1289,7 @@ namespace ai
                 c.override = false;
                 cleannext = false;
             }
-            if(d->state == CS_DEAD && (!remote || d->respawned!=d->lifesequence) && (!cmode || cmode->respawnwait(d) <= 0) && lastmillis - d->lastpain >= 500)
+            if(d->state == CS_DEAD && d->respawned!=d->lifesequence && (!cmode || cmode->respawnwait(d) <= 0) && lastmillis - d->lastpain >= 500)
             {
                 addmsg(N_TRYSPAWN, "rc", d);
                 d->respawned = d->lifesequence;
@@ -1319,7 +1319,7 @@ namespace ai
                     }
                 }
             }
-            logic(d, c, run, curtime);
+            logic(d, c, run);
             break;
         }
         if(d->ai->trywipe) d->ai->wipe();
