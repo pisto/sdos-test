@@ -36,6 +36,7 @@ struct ctfclientmode : clientmode
         float interpangle;
         int interptime, vistime;
 #endif
+        bool wasdropped; //NEW
 
         flag() : id(-1) { reset(); }
 
@@ -59,6 +60,7 @@ struct ctfclientmode : clientmode
 #endif
             team = 0;
             droptime = owntime = 0;
+            wasdropped = false; //NEW
         }
 
 #ifndef SERVMODE
@@ -312,7 +314,7 @@ struct ctfclientmode : clientmode
     }
 
     bool canspawn(clientinfo *ci, bool connecting) 
-    { 
+    {
         return m_efficiency || !m_protect ? connecting || !ci->state.lastdeath || gamemillis+curtime-ci->state.lastdeath >= RESPAWNSECS*1000 : true;
     }
 
@@ -496,6 +498,7 @@ struct ctfclientmode : clientmode
 
     void drawhud(fpsent *d, int w, int h)
     {
+        if(disableradar) return; //NEW
         if(d->state == CS_ALIVE)
         {
             loopv(flags) if(flags[i].owner == d)
@@ -766,6 +769,11 @@ struct ctfclientmode : clientmode
             f.droploc = vec(-1, -1, -1);
             f.interptime = 0;
         }
+        //NEW
+        f.wasdropped = true;
+        string append;
+        if(mod::event::run(append, sizeof(append), mod::event::FLAG_DROP, "dsd", d->clientnum, d->name, d->flags) != mod::event::RESULT) append[0] = 0;
+        //NEW END
         conoutf(CON_GAMEINFO, "%s dropped %s", teamcolorname(d), teamcolorflag(f));
         playsound(S_FLAGDROP);
     }
@@ -809,6 +817,8 @@ struct ctfclientmode : clientmode
         f.interptime = 0;
         returnflag(i);
         if(m_protect && d->feetpos().dist(f.spawnloc) < FLAGRADIUS) d->flagpickup |= 1<<f.id;
+        mod::event::run(mod::event::FLAG_RETURN, "dsd", d->clientnum, d->name, d->flags); //NEW
+        f.wasdropped = false; //NEW
         conoutf(CON_GAMEINFO, "%s returned %s", teamcolorname(d), teamcolorflag(f));
         playsound(S_FLAGRETURN);
     }
@@ -833,6 +843,8 @@ struct ctfclientmode : clientmode
         if(shouldeffect) flageffect(i, m_hold ? 0 : team, interpflagpos(f), f.spawnloc);
         f.interptime = 0;
         returnflag(i, m_protect ? 0 : -1000);
+        mod::event::run(mod::event::FLAG_RESET); //NEW
+        f.wasdropped = false; //NEW
         if(shouldeffect)
         {
             conoutf(CON_GAMEINFO, "%s reset", teamcolorflag(f));
@@ -843,6 +855,7 @@ struct ctfclientmode : clientmode
     void scoreflag(fpsent *d, int relay, int relayversion, int goal, int goalversion, int goalspawn, int team, int score, int dflags)
     {
         setscore(team, score);
+        bool wasdropped = false; //NEW
         if(flags.inrange(goal))
         {
             flag &f = flags[goal];
@@ -853,6 +866,8 @@ struct ctfclientmode : clientmode
             {
                 flags[relay].version = relayversion;
                 flageffect(goal, team, f.spawnloc, flags[relay].spawnloc);
+                wasdropped = flags[relay].wasdropped; //NEW
+                flags[relay].wasdropped = false; //NEW
             }
             else flageffect(goal, team, interpflagpos(f), f.spawnloc);
             f.interptime = 0;
@@ -866,10 +881,19 @@ struct ctfclientmode : clientmode
             particle_textcopy(d->abovehead(), ds, PART_TEXT, 2000, 0x32FF64, 4.0f, -8);
         }
         d->flags = dflags;
-        conoutf(CON_GAMEINFO, "%s scored for %s", teamcolorname(d), teamcolor("your team", ctfflagteam(team), "the enemy team"));
+        //NEW
+        string append;
+        if(mod::event::run(append, sizeof(append), mod::event::FLAG_SCORE, "dsddd", d->clientnum, d->name, d->flags, score, (int)wasdropped) != mod::event::RESULT)
+             append[0] = 0;
+        //NEW END
+        conoutf(CON_GAMEINFO, "%s scored for %s%s", teamcolorname(d), teamcolor("your team", ctfflagteam(team), "the enemy team"), append); //NEW append
         playsound(team==ctfteamflag(player1->team) ? S_FLAGSCORE : S_FLAGFAIL);
 
-        if(score >= FLAGLIMIT) conoutf(CON_GAMEINFO, "%s captured %d flags", teamcolor("your team", ctfflagteam(team), "the enemy team"), score);
+        if(score >= FLAGLIMIT)
+        {
+            if(score == FLAGLIMIT) mod::event::run(mod::event::COAF, "s", team==1 ? "good" : (team==2 ? "evil" : "unknown")); //NEW
+            conoutf(CON_GAMEINFO, "%s captured %d flags", teamcolor("your team", ctfflagteam(team), "the enemy team"), score);
+        }
     }
 
     void takeflag(fpsent *d, int i, int version)
@@ -879,9 +903,14 @@ struct ctfclientmode : clientmode
         f.version = version;
         f.interploc = interpflagpos(f, f.interpangle);
         f.interptime = lastmillis;
-        if(m_hold) conoutf(CON_GAMEINFO, "%s picked up the flag for %s", teamcolorname(d), teamcolor("your team", d->team, "the enemy team"));
-        else if(m_protect || f.droptime) conoutf(CON_GAMEINFO, "%s picked up %s", teamcolorname(d), teamcolorflag(f));
-        else conoutf(CON_GAMEINFO, "%s stole %s", teamcolorname(d), teamcolorflag(f));
+        //NEW
+        string append;
+        if(mod::event::run(append, sizeof(append), mod::event::FLAG_TAKE, "dsd", d->clientnum, d->name, d->flags) != mod::event::RESULT) append[0] = 0; //NEW
+        //NEW END
+        if(m_hold) conoutf(CON_GAMEINFO, "%s picked up the flag for %s%s", teamcolorname(d), teamcolor("your team", d->team, "the enemy team"), append); //NEW append
+        else if(m_protect || f.droptime) conoutf(CON_GAMEINFO, "%s picked up %s%s", teamcolorname(d), teamcolorflag(f), append); //NEW append
+        else conoutf(CON_GAMEINFO, "%s stole %s%s", teamcolorname(d), teamcolorflag(f), append); //NEW append
+        f.droptime = 0; //NEW
         ownflag(i, d, lastmillis);
         playsound(S_FLAGPICKUP);
     }

@@ -2,23 +2,35 @@
 
 #include "cube.h"
 
-void *operator new(size_t size) throw()
+#ifndef USE_STD_NEW //NEW
+// MinGW + LTO + weak new/delete causes troubles
+#if defined(__lto__) && defined(__MINGW32__) && !defined(__clang__)
+#undef WEAK
+#define WEAK
+#endif
+
+//NEW WEAK & throw()
+
+WEAK void *operator new(size_t size) throw()
 {
     void *p = malloc(size);
     if(!p) abort();
     return p;
 }
 
-void *operator new[](size_t size) throw()
+WEAK void *operator new[](size_t size) throw()
 {
     void *p = malloc(size);
     if(!p) abort();
     return p;
 }
 
-void operator delete(void *p) throw() { if(p) free(p); }
+WEAK void operator delete(void *p) throw() { if(p) free(p); }
+WEAK void operator delete(void *p, size_t) throw() { if(p) free(p); }   //NEW
 
-void operator delete[](void *p) throw() { if(p) free(p); }
+WEAK void operator delete[](void *p) throw() { if(p) free(p); }
+WEAK void operator delete[](void *p, size_t) throw() { if(p) free(p); } //NEW
+#endif //!USE_STD_NEW
 
 #ifndef WIN32
 #include <unistd.h>
@@ -149,6 +161,19 @@ void sendstring(const char *t, ucharbuf &p) { sendstring_(t, p); }
 void sendstring(const char *t, packetbuf &p) { sendstring_(t, p); }
 void sendstring(const char *t, vector<uchar> &p) { sendstring_(t, p); }
 
+//NEW
+template<class T>
+void sendstring(const mod::strtool &text, T &p)
+{
+    for(int c : text) putint(p, c);
+    putint(p, 0);
+}
+
+void sendstring(const mod::strtool &text, ucharbuf &p) { sendstring<ucharbuf>(text, p); }
+void sendstring(const mod::strtool &text, packetbuf &p) { sendstring<packetbuf>(text, p); }
+void sendstring(const mod::strtool &text, vector<uchar> &p) { sendstring<vector<uchar>>(text, p); }
+//NEW END
+
 void getstring(char *text, ucharbuf &p, size_t len)
 {
     char *t = text;
@@ -160,6 +185,26 @@ void getstring(char *text, ucharbuf &p, size_t len)
     }
     while(*t++);
 }
+
+//NEW
+void getstring(mod::strtool &text, ucharbuf &p, size_t maxlen, bool secret)
+{
+    if (secret)
+    {
+        text.secureclear();
+        text.growbuf(++maxlen);
+    }
+    else text.clear();
+    int c = 0;
+    while(maxlen-- && p.remaining() && (c = getint(p))) text += c&0xFF;
+    if(c) while(p.remaining() && getint(p));
+}
+
+void getstring(ucharbuf &p)
+{
+    while(p.remaining() && getint(p));
+}
+//NEW END
 
 void filtertext(char *dst, const char *src, bool whitespace, bool forcespace, size_t len)
 {
@@ -180,6 +225,31 @@ void filtertext(char *dst, const char *src, bool whitespace, bool forcespace, si
     }
     *dst = '\0';
 }
+
+//NEW
+void filtertext(mod::strtool &text, bool whitespace, bool secret)
+{
+    mod::strtool filtered(text.length()+1);
+    bool strip = false;
+    for(int c : text)
+    {
+        if(c == '\f' || strip)
+        {
+            strip = !strip;
+            continue;
+        }
+        if(iscubeprint(c) || (iscubespace(c) && whitespace)) filtered += c&0xff;
+    }
+    text.swap(filtered);
+    if (secret) filtered.secureclear();
+}
+
+void getfilteredstring(mod::strtool &text, ucharbuf &p, bool whitespace, size_t maxlen, bool secret)
+{
+    getstring(text, p, maxlen, secret);
+    filtertext(text, whitespace, secret);
+}
+//NEW END
 
 void ipmask::parse(const char *name)
 {
@@ -213,22 +283,24 @@ void ipmask::parse(const char *name)
 int ipmask::print(char *buf) const
 {
     char *start = buf;
-    union { uchar b[sizeof(enet_uint32)]; enet_uint32 i; } ipconv, maskconv;
+    union { uchar b[sizeof(enet_uint32)]; enet_uint32 i; } ipconv/*, maskconv*/; //NEW commented maskconv
     ipconv.i = ip;
-    maskconv.i = mask;
+    //maskconv.i = mask; //NEW commented
     int lastdigit = -1;
-    loopi(4) if(maskconv.b[i])
+    loopi(4) /*if(maskconv.b[i])*/ //NEW commented if
     {
         if(lastdigit >= 0) *buf++ = '.';
         loopj(i - lastdigit - 1) { *buf++ = '*'; *buf++ = '.'; }
         buf += sprintf(buf, "%d", ipconv.b[i]);
         lastdigit = i;
     }
+#if 0 //NEW replaced
     enet_uint32 bits = ~ENET_NET_TO_HOST_32(mask);
     int range = 32;
     for(; (bits&0xFF) == 0xFF; bits >>= 8) range -= 8;
     for(; bits&1; bits >>= 1) --range;
     if(!bits && range%8) buf += sprintf(buf, "/%d", range);
+#endif
+    buf += sprintf(buf, "/%d", getbitcount()); //NEW
     return int(buf-start);
 }
-

@@ -251,6 +251,20 @@ typedef struct _ENetChannel
  *
  * No fields should be modified unless otherwise specified. 
  */
+
+//NEW
+struct realBandwidthStats
+{
+    enet_uint32 incomingDataTotal;
+    enet_uint32 outgoingDataTotal;
+    enet_uint32 packetsLost;
+    enet_uint32 packetsSent;
+    enet_uint32 packetsReceived;
+    void        *data;
+    void        (*freecallback)(void **);
+};
+//NEW END
+
 typedef struct _ENetPeer
 { 
    ENetListNode  dispatchList;
@@ -313,6 +327,7 @@ typedef struct _ENetPeer
    enet_uint32   unsequencedWindow [ENET_PEER_UNSEQUENCED_WINDOW_SIZE / 32]; 
    enet_uint32   eventData;
    size_t        totalWaitingData;
+   struct realBandwidthStats bandwidthStats; //NEW
 } ENetPeer;
 
 /** An ENet packet compressor for compressing UDP packets before socket sends or receives.
@@ -556,6 +571,9 @@ ENET_API void       enet_host_channel_limit (ENetHost *, size_t);
 ENET_API void       enet_host_bandwidth_limit (ENetHost *, enet_uint32, enet_uint32);
 extern   void       enet_host_bandwidth_throttle (ENetHost *);
 extern  enet_uint32 enet_host_random_seed (void);
+
+ENET_API void       enet_do_not_link_against_wrong_lib(enet_uint32); //NEW dummy to prevent linking against wrong enet library
+
 
 ENET_API int                 enet_peer_send (ENetPeer *, enet_uint8, ENetPacket *);
 ENET_API ENetPacket *        enet_peer_receive (ENetPeer *, enet_uint8 * channelID);

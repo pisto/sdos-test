@@ -33,6 +33,8 @@ typedef struct
     void * data;
 } ENetBuffer;
 
+#define INIT_ENET_BUFFER(data, size) { size, data } //NEW
+
 #define ENET_CALLBACK __cdecl
 
 #ifdef ENET_DLL

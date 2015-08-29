@@ -20,7 +20,7 @@ struct editline
         len = maxlen = 0;
     }
 
-    bool grow(int total, const char *fmt = NULL, ...) PRINTFARGS(3, 4)
+    bool grow(int total, const char *fmt = "", ...)
     {
         if(total + 1 <= maxlen) return false;
         maxlen = (total + CHUNKSIZE) - total%CHUNKSIZE;
@@ -31,7 +31,7 @@ struct editline
             va_start(args, fmt);
             vformatstring(newtext, fmt, args, maxlen);
             va_end(args);
-        } else newtext[0] = '\0';
+        }
         DELETEA(text);
         text = newtext;
         return true;
@@ -747,7 +747,8 @@ TEXTCOMMAND(textinit, "sss", (char *name, char *file, char *initval), // loads i
         e->load();
     }
 });
- 
+TEXTCOMMAND(textset, "s", (char *val), top->clear(); top->insert(val);); //NEW
+
 #define PASTEBUFFER "#pastebuffer"
 
 TEXTCOMMAND(textcopy, "", (), editor *b = useeditor(PASTEBUFFER, EDITORFOREVER, false); top->copyselectionto(b););

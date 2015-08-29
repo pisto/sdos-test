@@ -1,7 +1,5 @@
 #include "game.h"
 
-extern int multipoll;
-
 namespace game
 {
     bool intermission = false;
@@ -219,7 +217,7 @@ namespace game
         }
     }
 
-    VARFP(slowmosp, 0, 0, 1, { if(m_sp && !slowmosp) server::forcegamespeed(100); }); 
+    VARFP(slowmosp, 0, 0, 1, { if(m_sp && !slowmosp) server::forcegamespeed(100); });
 
     void checkslowmo()
     {
@@ -396,6 +394,7 @@ namespace game
     }
 
     VARP(teamcolorfrags, 0, 1, 1);
+    MODVARP(indentfrags, 0, 4, 8); //NEW
 
     void killed(fpsent *d, fpsent *actor)
     {
@@ -407,36 +406,47 @@ namespace game
             return;
         }
         else if((d->state!=CS_ALIVE && d->state != CS_LAGGED && d->state != CS_SPAWNING) || intermission) return;
-
-        fpsent *h = followingplayer();
-        if(!h) h = player1;
-        int contype = d==h || actor==h ? CON_FRAG_SELF : CON_FRAG_OTHER;
-        const char *dname = "", *aname = "";
-        if(m_teammode && teamcolorfrags)
+        if(mod::event::run(mod::event::PLAYER_FRAG, "dsdsd", actor->clientnum, actor->name, d->clientnum, d->name, actor->gunselect) <= 0) //NEW
         {
-            dname = teamcolorname(d, "you");
-            aname = teamcolorname(actor, "you");
-        }
-        else
-        {
-            dname = colorname(d, NULL, "", "", "you");
-            aname = colorname(actor, NULL, "", "", "you");
-        }
-        if(actor->type==ENT_AI)
-            conoutf(contype, "\f2%s got killed by %s!", dname, aname);
-        else if(d==actor || actor->type==ENT_INANIMATE)
-            conoutf(contype, "\f2%s suicided%s", dname, d==player1 ? "!" : "");
-        else if(isteam(d->team, actor->team))
-        {
-            contype |= CON_TEAMKILL;
-            if(actor==player1) conoutf(contype, "\f6%s fragged a teammate (%s)", aname, dname);
-            else if(d==player1) conoutf(contype, "\f6%s got fragged by a teammate (%s)", dname, aname);
-            else conoutf(contype, "\f2%s fragged a teammate (%s)", aname, dname);
-        }
-        else
-        {
-            if(d==player1) conoutf(contype, "\f2%s got fragged by %s", dname, aname);
-            else conoutf(contype, "\f2%s fragged %s", aname, dname);
+            fpsent *h = followingplayer();
+            if(!h) h = player1;
+            int contype = d==h || actor==h ? CON_FRAG_SELF : CON_FRAG_OTHER;
+            const char *dname = "", *aname = "";
+            if(m_teammode && teamcolorfrags)
+            {
+                dname = teamcolorname(d, "you");
+                aname = teamcolorname(actor, "you");
+            }
+            else
+            {
+                dname = colorname(d, NULL, "", "", "you");
+                aname = colorname(actor, NULL, "", "", "you");
+            }
+            string indent;                                              //NEW
+            mod::strtool is(indent, sizeof(indent));                    //NEW
+            is.add(' ', indentfrags);                                   //NEW
+            is.finalize();                                              //NEW
+            if(actor->type==ENT_AI)
+                conoutf(contype, "%s\f2%s got killed by %s!", indent, dname, aname);          //NEW indent
+            else if(d==actor || actor->type==ENT_INANIMATE)
+                conoutf(contype, "%s\f2%s suicided%s", indent, dname, d==player1 ? "!" : ""); //NEW indent
+            else if(isteam(d->team, actor->team))
+            {
+                //NEW
+                string tkstats; tkstats[0] = '\0';
+                gamemod::countteamkills(actor, true, tkstats, sizeof(tkstats));
+                mod::event::run(mod::event::PLAYER_TEAM_KILL, "dsds", actor->clientnum, actor->name, d->clientnum, d->name);
+                //NEW END
+                contype |= CON_TEAMKILL;
+                if(actor==player1) conoutf(contype, "%s\f6%s fragged a teammate (%s)", indent, aname, dname);            //NEW indent
+                else if(d==player1) conoutf(contype, "%s\f6%s got fragged by a teammate (%s)", indent, dname, aname);    //NEW indent
+                else conoutf(contype, "%s\f6%s fragged a teammate (%s) %s", indent, aname, dname, tkstats);              //NEW indent, tkstats
+            }
+            else
+            {
+                if(d==player1) conoutf(contype, "%s\f2%s got fragged by %s", indent, dname, aname); //NEW indent
+                else conoutf(contype, "%s\f2%s fragged %s", indent, aname, dname);                  //NEW indent
+            }
         }
         deathstate(d);
 		ai::killed(d, actor);
@@ -464,17 +474,46 @@ namespace game
 
             showscores(true);
             disablezoom();
-            
+
             if(identexists("intermission")) execute("intermission");
+            mod::event::run(mod::event::INTERMISSION, "ss", server::modename(gamemode), game::getclientmap()); //NEW
         }
     }
 
-    ICOMMAND(getfrags, "", (), intret(player1->frags));
-    ICOMMAND(getflags, "", (), intret(player1->flags));
-    ICOMMAND(getdeaths, "", (), intret(player1->deaths));
-    ICOMMAND(getaccuracy, "", (), intret((player1->totaldamage*100)/max(player1->totalshots, 1)));
-    ICOMMAND(gettotaldamage, "", (), intret(player1->totaldamage));
-    ICOMMAND(gettotalshots, "", (), intret(player1->totalshots));
+    //NEW
+    void adjusttimeleft(int millis)
+    {
+        lastmillis += millis;
+    }
+
+    int gettimeleft()
+    {
+        return maplimit-lastmillis;
+    }
+
+    fpsent *getclient(const char *client)
+    {
+        if (*client)
+        {
+            char *end = NULL;
+            int cn = strtol(client, &end, 10);
+            if (end > client && !*end) return getclient(cn);
+        }
+        return NULL;
+    }
+    //NEW END
+
+    //NEW extended commands to support other clients
+    ICOMMAND(getfrags, "s", (const char *cn), fpsent *o = getclient(cn); if(!o) o = player1; intret(o->frags));
+    ICOMMAND(getflags, "s", (const char *cn), fpsent *o = getclient(cn); if(!o) o = player1; intret(o->flags));
+    ICOMMAND(getdeaths, "s", (const char *cn), fpsent *o = getclient(cn); if(!o) o = player1; intret(o->extinfo ? o->extinfo->deaths : o->deaths));
+    ICOMMAND(getteamkills, "s", (const char *cn), fpsent *o = getclient(cn); if(!o) o = player1; intret(o->extinfo ? o->extinfo->teamkills : o->teamkills)); //NEW
+    ICOMMAND(getaccuracy, "s", (const char *cn), fpsent *o = getclient(cn); if(!o) o = player1; intret(o->extinfo ? o->extinfo->acc : (o->totaldamage*100)/max(o->totalshots, 1)));
+    ICOMMAND(gettotaldamage, "s", (const char *cn), fpsent *o = getclient(cn); if(!o) o = player1; intret(o->totaldamage));
+    ICOMMAND(gettotalshots, "s", (const char *cn), fpsent *o = getclient(cn); if(!o) o = player1; intret(o->totalshots));
+    ICOMMAND(getping, "s", (const char *cn), fpsent *o = getclient(cn); if(!o) o = player1; intret(o->ping)); //NEW
+    ICOMMAND(getfloatping, "s", (const char *cn), fpsent *o = getclient(cn); if(!o) o = player1; floatret(o->highresping)); //NEW
+    ICOMMAND(gethudclientnum, "", (), intret(hudplayer()->clientnum)); //NEW
 
     vector<fpsent *> clients;
 
@@ -495,13 +534,18 @@ namespace game
             d->clientnum = cn;
             clients[cn] = d;
             players.add(d);
+            mod::extinfo::newplayer(d->clientnum); //NEW
         }
         return clients[cn];
     }
 
     fpsent *getclient(int cn)   // ensure valid entity
     {
-        if(cn == player1->clientnum) return player1;
+        if(cn == player1->clientnum)
+        {
+            if(game::demoplayback) return NULL; //NEW  don't allow demos to get player1
+            return player1;
+        }
         return clients.inrange(cn) ? clients[cn] : NULL;
     }
 
@@ -516,7 +560,11 @@ namespace game
         unignore(cn);
         fpsent *d = clients[cn];
         if(!d) return;
-        if(notify && d->name[0]) conoutf("\f4leave:\f7 %s", colorname(d));
+        if(notify && d->name[0])
+        {
+            mod::event::run(mod::event::PLAYER_DISCONNECT, "ds", d->clientnum, d->name); //NEW
+            conoutf("\f4leave:\f7 %s", colorname(d));
+        }
         removeweapons(d);
         removetrackedparticles(d);
         removetrackeddynlights(d);
@@ -558,10 +606,12 @@ namespace game
             d->frags = d->flags = 0;
             d->deaths = 0;
             d->totaldamage = 0;
+            d->damagedealt = 0; //NEW
             d->totalshots = 0;
             d->maxhealth = 100;
             d->lifesequence = -1;
             d->respawned = d->suicided = -2;
+            d->teamkills = 0;
         }
 
         setclientmode();
@@ -597,6 +647,7 @@ namespace game
         lasthit = 0;
 
         if(identexists("mapstart")) execute("mapstart");
+        mod::event::run(mod::event::MAPSTART, "ss", server::modename(gamemode), game::getclientmap()); //NEW
     }
 
     void startmap(const char *name)   // called just after a map load
@@ -609,7 +660,7 @@ namespace game
         else findplayerspawn(player1, -1);
         entities::resetspawns();
         copystring(clientmap, name ? name : "");
-        
+
         sendmapinfo();
     }
 
@@ -641,12 +692,22 @@ namespace game
         if(!d || d==player1)
         {
             addmsg(N_SOUND, "ci", d, n);
+            //NEW
+            if(mod::demorecorder::demorecord)
+                mod::demorecorder::self::sound(d, n);
+            //NEW END
             playsound(n);
         }
         else
         {
             if(d->type==ENT_PLAYER && ((fpsent *)d)->ai)
+            {
                 addmsg(N_SOUND, "ci", d, n);
+                //NEW
+                if(mod::demorecorder::demorecord)
+                    mod::demorecorder::self::sound(d, n);
+                //NEW END
+            }
             playsound(n, &d->o);
         }
     }
@@ -677,7 +738,8 @@ namespace game
     const char *colorname(fpsent *d, const char *name, const char *prefix, const char *suffix, const char *alt)
     {
         if(!name) name = alt && d == player1 ? alt : d->name; 
-        bool dup = !name[0] || duplicatename(d, name, alt) || d->aitype != AI_NONE;
+        extern int showclientnum; //NEW
+        bool dup = showclientnum == 2 || !name[0] || duplicatename(d, name, alt) || d->aitype != AI_NONE; //NEW showclientnum == 2 ||
         if(dup || prefix[0] || suffix[0])
         {
             cidx = (cidx+1)%3;
@@ -709,6 +771,15 @@ namespace game
         return teamcolor(name, team && isteam(team, player1->team), alt);
     }
 
+    //NEW
+    MODVARP(chatcolors, 0, 0, 1);
+    const char *chatcolorname(fpsent *d)
+    {
+        if(!chatcolors || !m_teammode || d->state == CS_SPECTATOR) return colorname(d);
+        return colorname(d, NULL, isteam(d->team, player1->team) ? "\fs\f1" : "\fs\f3", "\fr");
+    }
+    //NEW END
+
     void suicide(physent *d)
     {
         if(d==player1 || (d->type==ENT_PLAYER && ((fpsent *)d)->ai))
@@ -716,7 +787,7 @@ namespace game
             if(d->state!=CS_ALIVE) return;
             fpsent *pl = (fpsent *)d;
             if(!m_mp(gamemode)) killed(pl, pl);
-            else 
+            else
             {
                 int seq = (pl->lifesequence<<16)|((lastmillis/1000)&0xFFFF);
                 if(pl->suicided!=seq) { addmsg(N_SUICIDE, "rc", pl); pl->suicided = seq; }
@@ -725,7 +796,12 @@ namespace game
         else if(d->type==ENT_AI) suicidemonster((monster *)d);
         else if(d->type==ENT_INANIMATE) suicidemovable((movable *)d);
     }
+    ICOMMAND(suicide, "", (), suicide(player1));
     ICOMMAND(kill, "", (), suicide(player1));
+
+#if PROTOCOL_VERSION > 259
+#error remove ICOMMAND(kill, ...);
+#endif
 
     bool needminimap() { return m_ctf || m_protect || m_hold || m_capture || m_collect; }
 
@@ -838,21 +914,7 @@ namespace game
         }
     }
 
-    /* Game Clock */
-    XIDENT(IDF_SWLACC, VARP, gameclock, 0, 1, 1);
-    //XIDENT(IDF_SWLACC, VARP, gameclockcountup, 0, 0, 1);  // TODO: fix the up-counting mode
-    XIDENT(IDF_SWLACC, VARP, gameclocksize, 1, 5, 30);
-    XIDENT(IDF_SWLACC, VARP, gameclockturnredonlowtime, 0, 1, 1);
-    XIDENT(IDF_SWLACC, VARP, gameclockcolor_r, 0, 255, 255);
-    XIDENT(IDF_SWLACC, VARP, gameclockcolor_g, 0, 255, 255);
-    XIDENT(IDF_SWLACC, VARP, gameclockcolor_b, 0, 255, 255);
-    XIDENT(IDF_SWLACC, VARP, gameclockcolor_a, 0, 255, 255);
-    XIDENT(IDF_SWLACC, VARP, gameclockoffset_x, 0, 900, 1000);
-    XIDENT(IDF_SWLACC, VARP, gameclockoffset_y, 0, 5, 1000);
-    XIDENT(IDF_SWLACC, VARP, gameclockoffset_x_withradar, 0, 765, 1000);
-    XIDENT(IDF_SWLACC, VARP, gameclockoffset_y_withradar, 0, 15, 1000);
-    ICOMMAND(managegameclock, "", (), executestr("showgui gameclock_settings"));
-    /* ---------- */
+    bool disableradar = false; // NEW
 
     void gameplayhud(int w, int h)
     {
@@ -874,7 +936,7 @@ namespace game
                 int color = f->state!=CS_DEAD ? 0xFFFFFF : 0x606060;
                 if(f->privilege)
                 {
-                    color = f->privilege>=PRIV_ADMIN ? 0xFF8000 : 0x40FF80;
+                    color = f->privilege>=PRIV_ADMIN ? 0xFF8000 : f->privilege==PRIV_AUTH ? gamemod::COLOR_AUTH : 0x40FF80; //NEW o->privilege==PRIV_AUTH ? gamemod::AUTH_COLOR :
                     if(f->state==CS_DEAD) color = (color>>1)&0x7F7F7F;
                 }
                 draw_text(colorname(f), w*1800/h - fw - pw, 1650 - fh, (color>>16)&0xFF, (color>>8)&0xFF, color&0xFF);
@@ -889,46 +951,87 @@ namespace game
         }
 
         glPopMatrix();
+    }
 
-        const int gamemode = game::gamemode;
-        if(gameclock && !m_edit)
+    //NEW
+
+    MODVARP(showtimeleft, 0, 1, 1);
+    MODVARP(showpingdisplay, 0, 1, 1);
+    MODVARP(shownetworkdisplay, 0, 0, 1);
+    MODVARP(showstatsdisplay, 0, 1, 1);
+    MODVARP(scaletimeleft, 0, 1, 1);
+
+    static int displays = 0; //NEW
+    inline void increasedisplaycount() { displays++; }
+    inline int getdisplaycount() { return displays; }
+    struct resetdisplaycount { resetdisplaycount(int) {} ~resetdisplaycount() { displays = 0; } };
+
+    void renderping(int w, int h, int fonth)
+    {
+        if(!showpingdisplay || showfpsrange || (!isconnected(false, false) && !game::demoplayback)) return;
+        fpsent *d = hudplayer();
+        if(game::demoplayback && d == player1) return;
+        if(d->aitype!=AI_NONE)
         {
-            static char buf[16];
-            const int millis = max(game::maplimit-lastmillis, 0);
-            int secs = millis/1000;
-            int mins = secs/60;
-            secs %= 60;
-            sprintf(buf, "%d:%02d", mins, secs);
-            
-            const float conscale = 0.33f;
-            const int conw = int(w/conscale), conh = int(h/conscale);
-            
-            int r = gameclockcolor_r,
-                g = gameclockcolor_g,
-                b = gameclockcolor_b,
-                a = gameclockcolor_a;
-            
-            if (mins < 1 && gameclockturnredonlowtime) {
-                r = 255;
-                g = 0;
-                b = 0;
-                a = 255;
-            }
-            
-            const float gameclockscale = 1 + gameclocksize/10.0;
-            const bool radar = (m_ctf || m_capture);
-            const float xoff = ((radar ? gameclockoffset_x_withradar : gameclockoffset_x)*conw/1000);
-            const float yoff = ((radar ? gameclockoffset_y_withradar : gameclockoffset_y)*conh/1000);
-            
-            glPushMatrix();
-            glScalef(conscale*gameclockscale, conscale*gameclockscale, 1);
-            draw_text(buf,
-                      xoff/gameclockscale,
-                      yoff/gameclockscale,
-                      r, g, b, a);
-            glPopMatrix();
+            d = getclient(d->ownernum);
+            if(!d) return;
+        }
+        float ping = d->highresping;
+        draw_textf("%.2f ms", w-10*fonth, h-fonth*3/2, ping);
+        increasedisplaycount();
+    }
+
+    void rendertimeleft(int w, int h, int fonth)
+    {
+        if(showtimeleft && !m_sp && hudplayer()->state!=CS_EDITING)
+        {
+            int t = m_edit ? lastmillis/1000 : (intermission ? 0 : max(maplimit-lastmillis, 0)/1000)*100/(scaletimeleft ? gamespeed : 100);
+            int m = t/60, s = t%60;
+            if(!(!m_edit && !m && s && s<30 && lastmillis%1000>=500))
+                draw_textf("%s%d:%-2.2d", w-(10+(getdisplaycount()*4))*fonth, h-fonth*3/2, (!m_edit && !m) ? "\f3" : "", m, s);
+            increasedisplaycount();
         }
     }
+
+    void rendernetwork(int w, int h, int screenw, int screenh, int fonth)
+    {
+        resetdisplaycount rdc(0);
+        if(!shownetworkdisplay || !curpeer || !curpeer->bandwidthStats.data) return;
+        if(getdisplaycount() && screenw/float(screenh)<1.6f)
+        {
+            static int c = 0;
+            if(c++ % 1000 == 0)
+            {
+                conoutf("screen resolution too low for network "
+                        "display (turn pingdisplay and timeleft off)");
+            }
+            return;
+        }
+        clientbwstats *bw = (clientbwstats *)curpeer->bandwidthStats.data;
+        defformatstring(bwtext)("%.2f kb/s (%d p/s) // %.2f kb/s (%d p/s)",
+            bw->curincomingkbs, bw->curincomingpacketssec, bw->curoutgoingkbs, bw->curoutgoingpacketssec);
+        int lengthoffset = strlen(bwtext)-39;
+        if(lengthoffset>1) lengthoffset /= 2;
+        else lengthoffset = 0;
+        draw_text(bwtext, w-(22+(getdisplaycount()*5)+lengthoffset)*fonth, h-fonth*3/2);
+    }
+
+    static const char *sdfmtdefault = "Frags: \f0%f \f7Deaths: \f3%d \f7KpD: \f0%k \f7Acc: \f1%a%%"
+                                      "[ctf] \fs\f7Flags: \f0%x\fr [ctf][collect] \fs\f7Skulls: \f0%x\fr[collect]";
+
+    MODSVARFP(statsdisplayfmt, sdfmtdefault, if(!statsdisplayfmt[0]) setsvar("statsdisplayfmt", sdfmtdefault, false));
+
+    bool renderstatsdisplay(int conw, int conh, int FONTH, int woffset, int roffset)
+    {
+        if(!showstatsdisplay) return false;
+        string stats; *stats = 0;
+        gamemod::getgamestate(hudplayer(), statsdisplayfmt, stats, sizeof(stats));
+        int tw = text_width(stats);
+        draw_text(stats, conw-max(5*FONTH, 2*FONTH+tw)-woffset, conh-FONTH*3/2-roffset);
+        return true;
+    }
+
+    //NEW END
 
     int clipconsole(int w, int h)
     {
@@ -991,9 +1094,10 @@ namespace game
 
     bool serverinfostartcolumn(g3d_gui *g, int i)
     {
-        static const char * const names[] = { "ping ", "players ", "mode ", "map ", "time ", "master ", "host ", "port ", "description " };
-        static const float struts[] =       { 7,       7,          12.5f,   14,      7,      8,         14,      7,       24.5f };
-        if(size_t(i) >= sizeof(names)/sizeof(names[0])) return false;
+        static const char * const names[] =  { "ping ", "players ", "mode ", "map ", "time ", "master ", "host ", "port ", "description ", "country" }; //NEW "country"
+        static const float struts[] =        { 7,       7,          12.5f,   14,      7,      8,         14,      7,       24.5f,          3 };         //NEW country column
+        extern int showcountry; //NEW
+        if(size_t(i) >= (sizeof(names)/sizeof(names[0])-!showcountry)) return false; //NEW -!showcountry
         g->pushlist();
         g->text(names[i], 0xFFFF80, !i ? " " : NULL);
         if(struts[i]) g->strut(struts[i]);
@@ -1018,8 +1122,44 @@ namespace game
         return (n>=MM_START && size_t(n-MM_START)<sizeof(mastermodeicons)/sizeof(mastermodeicons[0])) ? mastermodeicons[n-MM_START] : unknown;
     }
 
-    bool serverinfoentry(g3d_gui *g, int i, const char *name, int port, const char *sdesc, const char *map, int ping, const vector<int> &attr, int np)
+    //NEW
+    MODSVARFP(filterservercountry, "", for(char *c = filterservercountry; *c; c++) *c = toupper(*c));
+    MODSVARFP(filterserverdesc, "", for(char *c = filterserverdesc; *c; c++) *c = tolower(*c));
+    MODVARP(filterservermode, STARTGAMEMODE-1, STARTGAMEMODE-1, NUMGAMEMODES);
+    MODSVARFP(filterservermodestring, "", for(char *c = filterservermodestring; *c; c++) *c = tolower(*c));
+    MODVARP(filterservermod, INT_MIN, 0, INT_MAX);
+    MODSVARFP(filterserverhost, "", for(char *c = filterserverhost; *c; c++) *c = toupper(*c));
+    MODVARP(filterservermastermode, MM_START-1, MM_START-1, int(sizeofarray(mastermodenames))+MM_START);
+    //NEW END
+
+    bool serverinfoentry(g3d_gui *g, bool &shown, int i, const char *name, int port, const char *sdesc, const char *map, int ping, const vector<int> &attr, int np, int servermod, const char *country, const char *countrycode) //NEW shown, servermod, country, countrycode
     {
+        //NEW
+        shown = false;
+        if(filterservercountry[0] && (!countrycode || strcmp(filterservercountry, countrycode))) return false;
+        if(filterservermod && filterservermod != servermod) return false;
+        if(filterserverdesc[0])
+        {
+            string tmp; mod::strtool desc(tmp, sizeof(tmp));
+            desc = sdesc; desc.lowerstring();
+            if(!desc.find(filterserverdesc)) return false;
+        }
+        if(filterservermode != STARTGAMEMODE-1 && (attr.length()<2 || filterservermode != attr[1])) return false;
+        else if(filterservermodestring[0])
+        {
+            if(attr.length()<2) return false;
+            if(!strstr(server::modename(attr[1], ""), filterservermodestring)) return false;
+        }
+        if(filterserverhost[0])
+        {
+            string tmp; mod::strtool stname(tmp, sizeof(tmp));
+            stname = name; stname.upperstring();
+            if(!stname.find(filterserverhost)) return false;
+        }
+        if(filterservermastermode>-1 && (attr.length()<5 || filterservermastermode != attr[4])) return false;
+        shown = true;
+        //NEW END
+
         if(ping < 0 || attr.empty() || attr[0]!=PROTOCOL_VERSION)
         {
             switch(i)
@@ -1051,6 +1191,13 @@ namespace game
                     }
                     else if(g->buttonf("[%s protocol] ", 0xFFFFDD, NULL, attr.empty() ? "unknown" : (attr[0] < PROTOCOL_VERSION ? "older" : "newer"))&G3D_UP) return true;
                     break;
+
+                //NEW
+                case 9:
+                    extern int showcountry; bool unused;
+                    rendercountry(*g, countrycode, country, showcountry, &unused);
+                    break;
+                //NEW END
             }
             return false;
         }
@@ -1060,7 +1207,7 @@ namespace game
             case 0:
             {
                 const char *icon = attr.inrange(3) && np >= attr[3] ? "serverfull" : (attr.inrange(4) ? mastermodeicon(attr[4], "serverunk") : "serverunk");
-                if(g->buttonf("%d ", 0xFFFFDD, icon, ping)&G3D_UP) return true;
+                if(g->buttonf("%d ", 0xFFFFDD, icon, (int)ping)&G3D_UP) return true;
                 break;
             }
 
@@ -1105,6 +1252,13 @@ namespace game
             case 8:
                 if(g->buttonf("%.25s", 0xFFFFDD, NULL, sdesc)&G3D_UP) return true;
                 break;
+
+            //NEW
+            case 9:
+                extern int showcountry; bool unused;
+                rendercountry(*g, countrycode, country, showcountry, &unused);
+                break;
+            //NEW END
         }
         return false;
     }
@@ -1117,11 +1271,13 @@ namespace game
     const char *restoreconfig() { return "restore.cfg"; }
     const char *defaultconfig() { return "data/defaults.cfg"; }
     const char *autoexec() { return "autoexec.cfg"; }
+    const char *wcautoexec() { return "wcautoexec.cfg"; } //NEW
+    const char *wcconfig() { return "wc-ng.cfg"; } //NEW
     const char *savedservers() { return "servers.cfg"; }
+    const char *history() { return "history"; }
 
     void loadconfigs()
     {
         execfile("auth.cfg", false);
     }
 }
-

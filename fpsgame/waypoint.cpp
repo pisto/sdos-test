@@ -164,7 +164,8 @@ namespace ai
 
     static int invalidatedwpcaches = 0, clearedwpcaches = (1<<NUMWPCACHES)-1, numinvalidatewpcaches = 0, lastwpcache = 0;
 
-    UNUSED static inline void invalidatewpcache(int wp)
+    UNUSED //NEW
+    static inline void invalidatewpcache(int wp)
     {
         if(++numinvalidatewpcaches >= 1000) { numinvalidatewpcaches = 0; invalidatedwpcaches = (1<<NUMWPCACHES)-1; }
         else

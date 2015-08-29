@@ -1064,7 +1064,7 @@ bool load_world(const char *mname, const char *cname)        // still supports a
     setvar("mapscale", worldscale, true, false);
 
     renderprogress(0, "loading vars...");
- 
+
     loopi(hdr.numvars)
     {
         int type = f->getchar(), ilen = f->getlil<ushort>();

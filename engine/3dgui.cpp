@@ -585,6 +585,11 @@ struct gui : g3d_gui
         draw_text(text, x, y, color>>16, (color>>8)&0xFF, color&0xFF, force ? -0xFF : 0xFF);
     }
 
+#ifdef IS_BROKEN_MINGW49
+    // defaultshader->set() causes a crash on 32 Bit Windows without no-inline.
+    // I suspect the !this checks in the Shader struct.
+    __attribute__((noinline))
+#endif //IS_BROKEN_MINGW49
     void background(int color, int inheritw, int inherith)
     {
         if(layoutpass) return;

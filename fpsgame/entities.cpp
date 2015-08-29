@@ -222,6 +222,10 @@ namespace entities
             putint(p, tp);
             putint(p, td);
             sendclientpacket(p.finalize(), 0);
+            //NEW
+            if(mod::demorecorder::demorecord)
+                mod::demorecorder::self::teleport(tp, td, d);
+            //NEW END
             flushclient();
         }
     }
@@ -248,6 +252,10 @@ namespace entities
             putint(p, jp);
             sendclientpacket(p.finalize(), 0);
             flushclient();
+            //NEW
+            if(mod::demorecorder::demorecord) 
+                mod::demorecorder::self::jumppad(jp, d);
+            //NEW END
         }
     }
 

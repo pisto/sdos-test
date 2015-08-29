@@ -747,6 +747,8 @@ VARP(movieaccel, 0, 1, 1);
 VARP(moviesync, 0, 0, 1);
 FVARP(movieminquality, 0, 0, 1);
 
+extern float conscale; //NEW
+
 namespace recorder
 {
     static enum { REC_OK = 0, REC_USERHALT, REC_TOOSLOW, REC_FILERROR } state = REC_OK;
@@ -1154,7 +1156,7 @@ namespace recorder
         defaultshader->set();
 
         glPushMatrix();
-        glScalef(1/3.0f, 1/3.0f, 1);
+        glScalef(conscale, conscale, 1); //NEW replaced 1/3.0f with conscale
     
         double totalsize = file->filespaceguess();
         const char *unit = "KB";
@@ -1162,7 +1164,13 @@ namespace recorder
         else if(totalsize >= 1e6) { totalsize /= 1e6; unit = "MB"; }
         else totalsize /= 1e3;
 
-        draw_textf("recorded %.1f%s %d%%", w*3-10*FONTH, h*3-FONTH-FONTH*3/2, totalsize, unit, int(calcquality()*100)); 
+        //draw_textf("recorded %.1f%s %d%%", w*3-10*FONTH, h*3-FONTH-FONTH*3/2, totalsize, unit, int(calcquality()*100)); //NEW replaced
+        //NEW
+        defformatstring(stats)("recorded %.1f%s %d%%", totalsize, unit, int(calcquality()*100));
+        w = int(w/conscale); h = int(h/conscale);
+        int tw = text_width(stats);
+        draw_text(stats, w-(2*FONTH+tw), h-FONTH*3/2-FONTH);
+        //NEW END
 
         glPopMatrix();
 

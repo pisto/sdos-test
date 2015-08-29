@@ -243,7 +243,25 @@ keym *findbind(char *key)
     });
     return NULL;
 }   
-    
+
+//NEW
+void delbinds(const char *action)
+{
+    enumerate(keyms, keym, km,
+    {
+        loopj(keym::NUMACTIONS)
+        {
+            char *&keyaction = km.actions[j];
+            if(!strcmp(keyaction, action))
+            {
+                delete[] keyaction;
+                keyaction = newstring("");
+            }
+        }
+    });
+}
+//NEW END
+
 void getbind(char *key, int type)
 {
     keym *km = findbind(key);
@@ -378,6 +396,78 @@ void history_(int *n)
 }
 
 COMMANDN(history, history_, "i");
+
+//NEW
+MODVARP(keephistory, 0, 1, 1);
+MODVARP(keepchathistory, 0, 0, 1);
+
+static inline void limithistory()
+{
+    if(maxhistory && history.length() >= maxhistory)
+    {
+        loopi(history.length()-maxhistory+1) delete history[i];
+        history.remove(0, history.length()-maxhistory+1);
+    }
+}
+
+static inline void skipuntileol(const char *&p, const char *end)
+{
+    while(p < end && *p!='\n') p++;
+}
+
+static inline bool containseol(const char *p, size_t &len)
+{
+    const char *s = p;
+    while(*p && *p!='\n') p++;
+    len = p-s; return *p;
+}
+
+void loadhistory(const char *file)
+{
+    if(!file[0]) file = game::history();
+    size_t size;
+    char *buf = loadfile(file, &size, true);
+    if(!buf) return;
+    const char *p = buf;
+    const char *end = buf+size;
+    size_t len;
+    bool command;
+    do
+    {
+        const char *s = p;
+        skipuntileol(p, end);
+        len = p-s; if(!len) continue;
+        command = s[0]=='/';
+        if(!command && !keepchathistory) continue;
+        hline *h = new hline;
+        h->buf = newstring(s, len);
+        if(command) h->flags = CF_EXECUTE;
+        limithistory();
+        history.add(h);
+    } while(++p /* skip \n */ < end);
+    histpos = history.length();
+    delete[] buf;
+}
+COMMAND(loadhistory, "s");
+
+void writehistory(const char *file)
+{
+    if(!file[0]) file = game::history();
+    stream *f = openutf8file(file, "wb");
+    if(!f) return;
+    size_t len;
+    loopv(history)
+    {
+        const char *line = history[i]->buf;
+        if(line[0]!='/' && !keepchathistory) continue;
+        if(containseol(line, len)) continue;
+        f->write(line, len);
+        f->putchar('\n');
+    }
+    delete f;
+}
+COMMAND(writehistory, "s");
+//NEW END
 
 struct releaseaction
 {
@@ -541,11 +631,14 @@ bool consolekey(int code, bool isdown)
             {
                 if(history.empty() || history.last()->shouldsave())
                 {
+                    #if 0 //NEW replaced
                     if(maxhistory && history.length() >= maxhistory)
                     {
                         loopi(history.length()-maxhistory+1) delete history[i];
                         history.remove(0, history.length()-maxhistory+1);
                     }
+                    #endif
+                    limithistory(); //NEW
                     history.add(h = new hline)->save();
                 }
                 else h = history.last();
@@ -585,6 +678,7 @@ void processkey(int code, bool isdown)
 
 void clear_console()
 {
+    writehistory(); //NEW
     keyms.clear();
 }
 

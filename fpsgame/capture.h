@@ -466,6 +466,7 @@ struct captureclientmode : clientmode
 
     void drawhud(fpsent *d, int w, int h)
     {
+        if(disableradar) return; //NEW
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         int s = 1800/4, x = 1800*w/h - s - s/10, y = s/10;
         glColor4f(1, 1, 1, minimapalpha);
@@ -594,7 +595,11 @@ struct captureclientmode : clientmode
     void setscore(int base, const char *team, int total)
     {
         findscore(team).total = total;
-        if(total>=10000) conoutf(CON_GAMEINFO, "%s captured all bases", teamcolor(team, team));
+        if(total>=10000)
+        {
+            mod::event::run(mod::event::COAB, "s", team); //NEW
+            conoutf(CON_GAMEINFO, "%s captured all bases", teamcolor(team, team));
+        }
         else if(bases.inrange(base))
         {
             baseinfo &b = bases[base];
@@ -607,6 +612,7 @@ struct captureclientmode : clientmode
             }
         }
     }
+    #undef TEAMCOLOR //NEW
 
     int closesttoenemy(const char *team, bool noattacked = false, bool farthest = false)
     {

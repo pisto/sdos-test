@@ -444,6 +444,7 @@ struct collectclientmode : clientmode
 
     void drawhud(fpsent *d, int w, int h)
     {
+        if(disableradar) return; //NEW
         if(d->state == CS_ALIVE && d->tokens > 0)
         {
             int x = HICON_X + 3*HICON_STEP + (d->quadmillis ? HICON_SIZE + HICON_SPACE : 0);
@@ -693,6 +694,10 @@ struct collectclientmode : clientmode
             base &b = bases[basenum];
             if(!n)
             {
+                //NEW
+                string append;
+                if(mod::event::run(append, sizeof(append), mod::event::SKULL_TAKE, "dsd", d->clientnum, d->name, 1) != mod::event::RESULT) append[0] = 0;
+                //NEW END
                 b.laststeal = lastmillis;
                 conoutf(CON_GAMEINFO, "%s stole a skull from %s", teamcolorname(d), teamcolor("your team", collectbaseteam(enemyteam), "the enemy team"));
                 playsound(S_FLAGDROP, &b.tokenpos);
@@ -718,11 +723,19 @@ struct collectclientmode : clientmode
         d->tokens = 0;
         d->flags = flags;
         setscore(team, score);
+        //NEW
+        string append;
+        if(mod::event::run(append, sizeof(append), mod::event::SKULL_SCORE, "dsdd", d->clientnum, d->name, d->flags, score) != mod::event::RESULT) append[0] = 0;
+        //NEW END
         
-        conoutf(CON_GAMEINFO, "%s collected %d %s for %s", teamcolorname(d), deposited, deposited==1 ? "skull" : "skulls", teamcolor("your team", collectbaseteam(team), "the enemy team"));
+        conoutf(CON_GAMEINFO, "%s collected %d %s for %s%s", teamcolorname(d), deposited, deposited==1 ? "skull" : "skulls", teamcolor("your team", collectbaseteam(team), "the enemy team"), append); //NEW append
         playsound(team==collectteambase(player1->team) ? S_FLAGSCORE : S_FLAGFAIL);
 
-        if(score >= SCORELIMIT) conoutf(CON_GAMEINFO, "%s collected %d skulls", teamcolor("your team", collectbaseteam(team), "the enemy team"), score);
+        if(score >= SCORELIMIT)
+        {
+            mod::event::run(mod::event::COAS, "s", team==1 ? "good" : (team==2 ? "evil" : "unknown")); //NEW
+            conoutf(CON_GAMEINFO, "%s collected %d skulls", teamcolor("your team", collectbaseteam(team), "the enemy team"), score);
+        }
     }
 
     void checkitems(fpsent *d)

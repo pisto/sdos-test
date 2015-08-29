@@ -488,5 +488,14 @@ enet_host_bandwidth_throttle (ENetHost * host)
        } 
     }
 }
+
+//NEW dummy to prevent linking against wrong enet library
+void
+enet_do_not_link_against_wrong_lib(enet_uint32 size)
+{
+    if (size != sizeof (struct realBandwidthStats))
+        abort();
+}
+//NEW END
     
 /** @} */

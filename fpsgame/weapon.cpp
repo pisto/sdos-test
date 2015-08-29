@@ -17,8 +17,6 @@ namespace game
     VARP(maxdebris, 10, 25, 1000);
     VARP(maxbarreldebris, 5, 10, 1000);
 
-    XIDENT(IDF_SWLACC, VARP, reducesparks, 0, 0, 1);
-
     ICOMMAND(getweapon, "", (), intret(player1->gunselect));
 
     void gunselect(int gun, fpsent *d)
@@ -27,6 +25,7 @@ namespace game
         {
             addmsg(N_GUNSELECT, "rci", d, gun);
             playsound(S_WEAPLOAD, &d->o);
+            if(mod::demorecorder::demorecord) mod::demorecorder::self::gunselect(gun); //NEW
         }
         d->gunselect = gun;
     }
@@ -207,19 +206,12 @@ namespace game
         adddecal(DECAL_BLOOD, vec(b->o).sub(vec(surface).mul(b->radius)), surface, 2.96f/b->bounces, bvec(0x60, 0xFF, 0xFF), rnd(4));
     }
         
-XIDENT(IDF_SWLACC, VARP, smokefps, 0, 80, 200);
     void updatebouncers(int time)
     {
-        static int lastbouncersmoke = -1000;
-        bool dosmoke = false;
-        if(smokefps && lastmillis - lastbouncersmoke >= 1000/smokefps){
-            lastbouncersmoke = lastmillis;
-            dosmoke = true;
-        }
         loopv(bouncers)
         {
             bouncer &bnc = *bouncers[i];
-            if(dosmoke && bnc.bouncetype==BNC_GRENADE && bnc.vel.magnitude() > 50.0f)
+            if(bnc.bouncetype==BNC_GRENADE && bnc.vel.magnitude() > 50.0f)
             {
                 vec pos(bnc.o);
                 pos.add(vec(bnc.offset).mul(bnc.offsetmillis/float(OFFSETMILLIS)));
@@ -409,12 +401,11 @@ XIDENT(IDF_SWLACC, VARP, smokefps, 0, 80, 200);
         }
     }
 
-    XIDENT(IDF_SWLACC, VARP, explosions, 0, 1, 1);
     void explode(bool local, fpsent *owner, const vec &v, dynent *safe, int damage, int gun)
     {
         particle_splash(PART_SPARK, 200, 300, v, 0xB49B4B, 0.24f);
         playsound(gun!=GUN_GL ? S_RLHIT : S_FEXPLODE, &v);
-        if(explosions) particle_fireball(v, guns[gun].exprad, gun!=GUN_GL ? PART_EXPLOSION : PART_EXPLOSION_BLUE, gun!=GUN_GL ? -1 : int((guns[gun].exprad-4.0f)*15), gun!=GUN_GL ? 0xFF8080 : 0x80FFFF, 4.0f);
+        particle_fireball(v, guns[gun].exprad, gun!=GUN_GL ? PART_EXPLOSION : PART_EXPLOSION_BLUE, gun!=GUN_GL ? -1 : int((guns[gun].exprad-4.0f)*15), gun!=GUN_GL ? 0xFF8080 : 0x80FFFF, 4.0f);
         if(gun==GUN_RL) adddynlight(v, 1.15f*guns[gun].exprad, vec(2, 1.5f, 1), 700, 100, 0, guns[gun].exprad/2, vec(1, 0.75f, 0.5f));
         else if(gun==GUN_GL) adddynlight(v, 1.15f*guns[gun].exprad, vec(0.5f, 1.5f, 2), 600, 100, 0, 8, vec(0.25f, 1, 1));
         else adddynlight(v, 1.15f*guns[gun].exprad, vec(2, 1.5f, 1), 700, 100);
@@ -504,14 +495,29 @@ XIDENT(IDF_SWLACC, VARP, smokefps, 0, 80, 200);
         return true;
     }
 
+    //NEW
+    // gun particle flare colors
+    MODHVARP(sgflarecolor, 0, 0xFFC864, 0xFFFFFF);
+    MODHVARP(cgflarecolor, 0, 0xFFC864, 0xFFFFFF);
+    MODHVARP(piflarecolor, 0, 0xFFC864, 0xFFFFFF);
+    MODHVARP(riflarecolor, 0, 0x404040, 0xFFFFFF);
+    MODHVARP(rlflarecolor, 0, 0x404040, 0xFFFFFF);
+    // gun particle_flare sizes
+    MODFVARP(sgflaresize, 0, 0.28f, 5.0f);
+    MODFVARP(cgflaresize, 0, 0.28f, 5.0f);
+    MODFVARP(piflaresize, 0, 0.28f, 5.0f);
+    MODFVARP(riflaresize, 0, 0.6f, 5.0f);
+    MODFVARP(rlflaresize, 0, 2.4f, 5.0f);
+    // gun particle_flare trail time in ms
+    MODVARP(sgtrailtime, 0, 300, 1000);
+    MODVARP(cgtrailtime, 0, 600, 1000);
+    MODVARP(pitrailtime, 0, 600, 1000);
+    MODVARP(ritrailtime, 0, 400, 1000);
+    MODVARP(rltrailtime, 0, 300, 1000);
+    //NEW END
+
     void updateprojectiles(int time)
     {
-        static int lastbouncersmoke = -1000;
-        bool dosmoke = false;
-        if(smokefps && lastmillis - lastbouncersmoke >= 1000/smokefps){
-            lastbouncersmoke = lastmillis;
-            dosmoke = true;
-        }
         loopv(projs)
         {
             projectile &p = projs[i];
@@ -550,19 +556,24 @@ XIDENT(IDF_SWLACC, VARP, smokefps, 0, 80, 200);
                 {
                     vec pos(v);
                     pos.add(vec(p.offset).mul(p.offsetmillis/float(OFFSETMILLIS)));
-                    if(dosmoke){
-                        if(guns[p.gun].part)
-                        {
-                            regular_particle_splash(PART_SMOKE, 2, 300, pos, 0x404040, 0.6f, 150, -20);
-                            int color = 0xFFFFFF;
-                            switch(guns[p.gun].part)
-                            {
-                                case PART_FIREBALL1: color = 0xFFC8C8; break;
-                            }
-                            particle_splash(guns[p.gun].part, 1, 1, pos, color, 4.8f, 150, 20);
-                        }
+                    if(guns[p.gun].part)
+                    {
+                         regular_particle_splash(PART_SMOKE, 2, 300, pos, 0x404040, 0.6f, 150, -20);
+                         int color = 0xFFFFFF;
+                         switch(guns[p.gun].part)
+                         {
+                            case PART_FIREBALL1: color = 0xFFC8C8; break;
+                         }
+                         particle_splash(guns[p.gun].part, 1, 1, pos, color, 4.8f, 150, 20);
+                    }
+                    //else regular_particle_splash(PART_SMOKE, 2, 300, pos, 0x404040, 2.4f, 50, -20); //NEW commented (replaced)
+                    //NEW
+                    else
+                    {
+                        if (p.gun == GUN_RL) regular_particle_splash(PART_SMOKE, 2, rltrailtime, pos, rlflarecolor, rlflaresize, 50, -20);
                         else regular_particle_splash(PART_SMOKE, 2, 300, pos, 0x404040, 2.4f, 50, -20);
                     }
+                    //NEW END
                 }
             }
             if(exploded)
@@ -597,8 +608,9 @@ XIDENT(IDF_SWLACC, VARP, smokefps, 0, 80, 200);
                     particle_flare(d->muzzle, d->muzzle, 200, PART_MUZZLE_FLASH3, 0xFFFFFF, 2.75f, d);
                 loopi(guns[gun].rays)
                 {
-                    if(!reducesparks) particle_splash(PART_SPARK, 20, 250, rays[i], 0xB49B4B, 0.24f);
-                    particle_flare(hudgunorigin(gun, from, rays[i], d), rays[i], 300, PART_STREAK, 0xFFC864, 0.28f);
+                    particle_splash(PART_SPARK, 20, 250, rays[i], 0xB49B4B, 0.24f);
+                    //particle_flare(hudgunorigin(gun, from, rays[i], d), rays[i], 300, PART_STREAK, 0xFFC864, 0.28f); //NEW commented (replaced)
+                    particle_flare(hudgunorigin(gun, from, rays[i], d), rays[i], sgtrailtime, PART_STREAK, sgflarecolor, sgflaresize); //NEW
                     if(!local) adddecal(DECAL_BULLET, rays[i], vec(from).sub(rays[i]).normalize(), 2.0f);
                 }
                 if(muzzlelight) adddynlight(hudgunorigin(gun, d->o, to, d), 30, vec(0.5f, 0.375f, 0.25f), 100, 100, DL_FLASH, 0, vec(0, 0, 0), d);
@@ -608,8 +620,10 @@ XIDENT(IDF_SWLACC, VARP, smokefps, 0, 80, 200);
             case GUN_CG:
             case GUN_PISTOL:
             {
-                if(!reducesparks) particle_splash(PART_SPARK, 200, 250, to, 0xB49B4B, 0.24f);
-                particle_flare(hudgunorigin(gun, from, to, d), to, 600, PART_STREAK, 0xFFC864, 0.28f);
+                particle_splash(PART_SPARK, 200, 250, to, 0xB49B4B, 0.24f);
+                //particle_flare(hudgunorigin(gun, from, to, d), to, 600, PART_STREAK, 0xFFC864, 0.28f); //NEW commented (replaced)
+                if(gun==GUN_CG) particle_flare(hudgunorigin(gun, from, to, d), to, cgtrailtime, PART_STREAK, cgflarecolor, cgflaresize); //NEW
+                else particle_flare(hudgunorigin(gun, from, to, d), to, pitrailtime, PART_STREAK, piflarecolor, piflaresize);            //NEW
                 if(muzzleflash && d->muzzle.x >= 0)
                     particle_flare(d->muzzle, d->muzzle, gun==GUN_CG ? 100 : 200, PART_MUZZLE_FLASH1, 0xFFFFFF, gun==GUN_CG ? 2.25f : 1.25f, d);
                 if(!local) adddecal(DECAL_BULLET, to, vec(from).sub(to).normalize(), 2.0f);
@@ -641,8 +655,9 @@ XIDENT(IDF_SWLACC, VARP, smokefps, 0, 80, 200);
             }
 
             case GUN_RIFLE:
-                if(!reducesparks) particle_splash(PART_SPARK, 200, 250, to, 0xB49B4B, 0.24f);
-                particle_trail(PART_SMOKE, 500, hudgunorigin(gun, from, to, d), to, 0x404040, 0.6f, 20);
+                particle_splash(PART_SPARK, 200, 250, to, 0xB49B4B, 0.24f);
+                //particle_trail(PART_SMOKE, 500, hudgunorigin(gun, from, to, d), to, 0x404040, 0.6f, 20); //NEW commented (replaced)
+                if(ritrailtime) particle_trail(PART_SMOKE, ritrailtime, hudgunorigin(gun, from, to, d), to, riflarecolor, riflaresize, 20); //NEW
                 if(muzzleflash && d->muzzle.x >= 0)
                     particle_flare(d->muzzle, d->muzzle, 150, PART_MUZZLE_FLASH3, 0xFFFFFF, 1.25f, d);
                 if(!local) adddecal(DECAL_BULLET, to, vec(from).sub(to).normalize(), 3.0f);
@@ -665,6 +680,7 @@ XIDENT(IDF_SWLACC, VARP, smokefps, 0, 80, 200);
                 break;
         }
         if(d->quadmillis && lastmillis-prevaction>200 && !looped) playsound(S_ITEMPUP, d==hudplayer() ? NULL : &d->o);
+        if(mod::demorecorder::demorecord && (d->ai || d==hudplayer())) mod::demorecorder::self::shoteffect(d, gun, id, from, to); //NEW
     }
 
     void particletrack(physent *owner, vec &o, vec &d)

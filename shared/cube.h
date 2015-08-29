@@ -5,11 +5,18 @@
 
 #ifdef __GNUC__
 #define gamma __gamma
+#else
+#define _CRT_SECURE_NO_WARNINGS //NEW
 #endif
 
 #ifdef WIN32
 #define _USE_MATH_DEFINES
 #endif
+//NEW
+#ifdef __GNUC__
+#include <stdint.h>
+#endif
+//NEW END
 #include <math.h>
 
 #ifdef __GNUC__
@@ -39,11 +46,10 @@
     #include <eh.h>
     #include <dbghelp.h>
   #endif
-//  #define ZLIB_DLL
+  //#define ZLIB_DLL
 #endif
 
 #ifndef STANDALONE
-#define GL_GLEXT_PROTOTYPES
 #include <SDL.h>
 #include <SDL_opengl.h>
 #endif
@@ -58,7 +64,23 @@
 #include "command.h"
 
 #include "iengine.h"
-#include "igame.h"
+
+//NEW
+#include "compat.h"
+
+#ifdef _MSC_VER
+#include "stdint.h"
+#include "inttypes.h"
+#endif
+
+#include "mod.h"
+
+#if !defined(STANDALONE) || defined(PLUGIN)
+#include "plugin.h"
+#endif
+//NEW END
+
+#include "igame.h" //NEW - moved down
 
 #endif
 

@@ -139,6 +139,11 @@ enet_protocol_notify_disconnect (ENetHost * host, ENetPeer * peer, ENetEvent * e
     if (peer -> state >= ENET_PEER_STATE_CONNECTION_PENDING)
        host -> recalculateBandwidthLimits = 1;
 
+    //NEW
+    if (peer -> bandwidthStats . freecallback)
+        peer -> bandwidthStats . freecallback ( & peer -> bandwidthStats . data );
+    //NEW END
+
     if (peer -> state != ENET_PEER_STATE_CONNECTING && peer -> state < ENET_PEER_STATE_CONNECTION_SUCCEEDED)
         enet_peer_reset (peer);
     else
@@ -1057,6 +1062,8 @@ enet_protocol_handle_incoming_commands (ENetHost * host, ENetEvent * event)
        peer -> address.host = host -> receivedAddress.host;
        peer -> address.port = host -> receivedAddress.port;
        peer -> incomingDataTotal += host -> receivedDataLength;
+       peer -> bandwidthStats . incomingDataTotal += host -> receivedDataLength; //NEW
+       ++ peer -> bandwidthStats . packetsReceived; //NEW
     }
     
     currentData = host -> receivedData + headerSize;
@@ -1446,6 +1453,7 @@ enet_protocol_check_timeouts (ENetHost * host, ENetPeer * peer, ENetEvent * even
          peer -> reliableDataInTransit -= outgoingCommand -> fragmentLength;
           
        ++ peer -> packetsLost;
+       ++ peer -> bandwidthStats . packetsLost; //NEW
 
        outgoingCommand -> roundTripTimeout *= host -> noTimeouts ? 1 : 2;
 
@@ -1576,7 +1584,7 @@ enet_protocol_send_reliable_outgoing_commands (ENetHost * host, ENetPeer * peer)
        }
 
        ++ peer -> packetsSent;
-        
+
        ++ command;
        ++ buffer;
     }
@@ -1728,6 +1736,8 @@ enet_protocol_send_outgoing_commands (ENetHost * host, ENetEvent * event, int ch
 
         if (sentLength < 0)
           return -1;
+        else
+            currentPeer -> bandwidthStats . packetsSent ++; //NEW
 
         host -> totalSentData += sentLength;
         host -> totalSentPackets ++;

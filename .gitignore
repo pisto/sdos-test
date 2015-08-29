@@ -2,3 +2,4 @@
 */*.o
 */*.res
 *.exe
+mod/wcversion.h

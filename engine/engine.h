@@ -358,8 +358,11 @@ extern bool serveroption(char *opt);
 // serverbrowser
 extern bool resolverwait(const char *name, ENetAddress *address);
 extern int connectwithtimeout(ENetSocket sock, const char *hostname, const ENetAddress &address);
-extern void addserver(const char *name, int port = 0, const char *password = NULL, bool keep = false);
+struct serverinfo; //NEW
+extern serverinfo *addserver(const char *name, int port = 0, const char *password = NULL, bool keep = false); //NEW void -> serverinfo *
+extern void rebindpingport(); //NEW
 extern void writeservercfg();
+extern void cleanupextinfo();
 
 // client
 extern void localdisconnect(bool cleanup = true);
@@ -383,10 +386,13 @@ extern void processkey(int code, bool isdown);
 extern void processtextinput(const char *str, int len);
 extern int rendercommand(int x, int y, int w);
 extern int renderconsole(int w, int h, int abovehud);
+extern void loadhistory(const char *file = ""); //NEW
+extern void writehistory(const char *file = ""); //NEW
 extern void conoutf(const char *s, ...) PRINTFARGS(1, 2);
 extern void conoutf(int type, const char *s, ...) PRINTFARGS(2, 3);
 extern void resetcomplete();
 extern void complete(char *s, const char *cmdprefix);
+extern void completename(char *s);
 const char *getkeyname(int code);
 extern const char *addreleaseaction(char *s);
 extern void writebinds(stream *f);
@@ -571,6 +577,7 @@ namespace recorder
     extern void stop();
     extern void capture(bool overlay = true);
     extern void cleanup();
+    extern bool isrecording(); //NEW
 }
 
 #endif

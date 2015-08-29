@@ -32,6 +32,8 @@ typedef struct
     size_t dataLength;
 } ENetBuffer;
 
+#define INIT_ENET_BUFFER(data, size) { data, size } //NEW
+
 #define ENET_CALLBACK
 
 #define ENET_API extern

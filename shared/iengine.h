@@ -1,5 +1,6 @@
 // the interface the game uses to access the engine
 
+extern int connmillis;                  //NEW
 extern int curtime;                     // current frame time
 extern int lastmillis;                  // last time
 extern int elapsedtime;                 // elapsed frame time
@@ -130,6 +131,16 @@ extern bool addkeyword(int type, const char *name);
 extern uint *compilecode(const char *p);
 extern void keepcode(uint *p);
 extern void freecode(uint *p);
+//NEW
+extern char *getcurrentcsfilename();
+extern const char *getcurrentcsfilenamep();
+extern void *compilecscode(const char *code);
+extern ident *getcsident(int i);
+extern ident *getcsident(const char *name);
+extern ident *addcsident(const char *name);
+extern const char *parsestring(const char *p);
+extern int unescapestring(char *dst, const char *src, const char *end);
+//NEW END
 extern void executeret(const uint *code, tagval &result = *commandret);
 extern void executeret(const char *p, tagval &result = *commandret);
 extern char *executestr(const uint *code);
@@ -185,6 +196,8 @@ extern void closelogfile();
 extern void logoutfv(const char *fmt, va_list args);
 extern void logoutf(const char *fmt, ...) PRINTFARGS(1, 2);
 
+extern void delbinds(const char *action);
+
 // menus
 extern vec menuinfrontofplayer();
 extern void newgui(char *name, char *contents, char *header = NULL, char *init = NULL);
@@ -222,7 +235,7 @@ extern void renderentsphere(const extentity &e, float radius);
 extern void renderentring(const extentity &e, float radius, int axis = 0);
 
 // main
-extern void fatal(const char *s, ...) PRINTFARGS(1, 2);
+extern void fatal(const char *s, ...) NORETURN PRINTFARGS(1, 2); //NEW NORETURN
 
 // rendertext
 extern bool setfont(const char *name);
@@ -270,6 +283,8 @@ extern void dynlightreaching(const vec &target, vec &color, vec &dir, bool hud =
 extern void removetrackeddynlights(physent *owner = NULL);
 
 // rendergl
+extern int showfpsrange; //NEW
+
 extern physent *camera1;
 extern vec worldpos, camdir, camright, camup;
 
@@ -451,6 +466,7 @@ extern void notifywelcome();
 // crypto
 extern void genprivkey(const char *seed, vector<char> &privstr, vector<char> &pubstr);
 extern bool hashstring(const char *str, char *result, int maxlen);
+extern bool hashstring(const char *str, const char *salt, string &hash); //NEW
 extern void answerchallenge(const char *privstr, const char *challenge, vector<char> &answerstr);
 extern void *parsepubkey(const char *pubstr);
 extern void freepubkey(void *pubkey);

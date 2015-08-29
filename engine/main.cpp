@@ -1,7 +1,6 @@
 // main.cpp: initialisation & main loop
 
 #include "engine.h"
-#include "sdosscripts.h"
 
 extern void cleargamma();
 
@@ -22,17 +21,20 @@ void cleanup()
     SDL_Quit();
 }
 
-void quit()                     // normal exit
+void quit(int *i = NULL)                     // normal exit     //NEW added int i
 {
     extern void writeinitcfg();
+    mod::deinit(); //NEW
     writeinitcfg();
     writeservercfg();
     abortconnect();
     disconnect();
     localdisconnect();
-    writecfg();
+    if(!i || *i == EXIT_SUCCESS) //NEW
+        writecfg();
     cleanup();
-    exit(EXIT_SUCCESS);
+    mod::plugin::unloadplugins(true); //NEW
+    exit(i ? *i : EXIT_SUCCESS); //NEW  i ? *i
 }
 
 void fatal(const char *s, ...)    // failure exit
@@ -42,7 +44,15 @@ void fatal(const char *s, ...)    // failure exit
 
     if(errors <= 2) // print up to one extra recursive error
     {
-        defvformatstring(msg,s,s);
+        //defvformatstring(msg,s,s); //NEW commented
+        //NEW
+        char msg[2048];
+        va_list vargs;
+        va_start(vargs, s);
+        vsnprintf(msg, sizeof(msg), s, vargs);
+        va_end(vargs);
+        //NEW END
+
         logoutf("%s", msg);
 
         if(errors <= 1) // avoid recursion
@@ -61,7 +71,7 @@ void fatal(const char *s, ...)    // failure exit
         }
     }
 
-    exit(EXIT_FAILURE);
+    _exit(EXIT_FAILURE); //NEW exit -> _exit (do not run destructors)
 }
 
 SDL_Window *screen = NULL;
@@ -69,6 +79,7 @@ int screenw = 0, screenh = 0, desktopw = 0, desktoph = 0, winw = 0, winh = 0;
 SDL_GLContext glcontext = NULL;
 
 int curtime = 0, lastmillis = 1, elapsedtime = 0, totalmillis = 1;
+atomic<int> atotalmillis(1); //NEW
 
 dynent *player = NULL;
 
@@ -125,7 +136,7 @@ void writeinitcfg()
     delete f;
 }
 
-COMMAND(quit, "");
+COMMAND(quit, "i"); //NEW i
 
 static void getbackgroundres(int &w, int &h)
 {
@@ -452,7 +463,7 @@ void renderprogress(float bar, const char *text, GLuint tex, bool background)   
     swapbuffers(false);
 }
 
-XIDENT(IDF_SWLACC, VARNP, relativemouse, userelativemouse, 0, 1, 1);
+MODVARNP(relativemouse, userelativemouse, 0, 1, 1);
 
 bool shouldgrab = false, grabinput = false, minimized = false, canrelativemouse = true, relativemouse = false;
 int keyrepeatmask = 0, textinputmask = 0;
@@ -945,11 +956,35 @@ void swapbuffers(bool overlay)
     SDL_GL_SwapWindow(screen);
 }
  
+//NEW
+static void maxfpschanged()
+{
+    extern int maxfps;
+    if(!maxfps) ++maxfps;
+    else if(maxfps < 0)
+    {
+        static const char *vendor = (const char *)glGetString(GL_VENDOR);
+        if(!strstr(vendor, "NVIDIA"))
+        {
+            mod::erroroutf_r("'/maxfps -1' is limited to nvidia graphic cards for now");
+            conoutf("setting maxfps to 1000 instead");
+            maxfps = 1000;
+        }
+        else
+        {
+            conoutf("PLEASE MONITOR THE TEMPERATURE OF YOUR HARDWARE WHILE USING '/maxfps -1'");
+            conoutf("I AM NOT LIABLE FOR ANY HARDWARE DAMAGES!");
+        }
+    }
+}
+//NEW END
+ 
 VAR(menufps, 0, 60, 1000);
-VARP(maxfps, 0, 200, 1000);
+VARFP(maxfps, -1, 200, 1000, maxfpschanged()); //NEW VARFP instead of VARP   -1 as MINVAL to disable the fps limiter
 
 void limitfps(int &millis, int curmillis)
 {
+    if(maxfps < 0 && !mainmenu && !minimized) return; //NEW
     int limit = (mainmenu || minimized) && menufps ? (maxfps ? min(maxfps, menufps) : menufps) : maxfps;
     if(!limit) return;
     static int fpserror = 0;
@@ -971,9 +1006,61 @@ void limitfps(int &millis, int curmillis)
     }
 }
 
+
 #if defined(WIN32) && !defined(_DEBUG) && !defined(__GNUC__)
+//NEW
+#ifdef PUBLIC_RELEASE
+bool createminidump(EXCEPTION_POINTERS *ep, const char *dmpfile)
+{
+    bool res = false;
+
+    HANDLE file = CreateFile(dmpfile, GENERIC_READ|GENERIC_WRITE,
+                             0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if(file && file != INVALID_HANDLE_VALUE)
+    {
+        MINIDUMP_EXCEPTION_INFORMATION mdei;
+
+        mdei.ThreadId = GetCurrentThreadId();
+        mdei.ExceptionPointers = ep;
+        mdei.ClientPointers = FALSE;
+
+        MINIDUMP_TYPE mdt = MiniDumpNormal;
+
+        res = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(),
+                                file, mdt, ep? &mdei : NULL, NULL, NULL) == TRUE;
+        CloseHandle(file);
+    }
+
+    return res;
+}
+#endif
+//NEW END
 void stackdumper(unsigned int type, EXCEPTION_POINTERS *ep)
 {
+//NEW
+#ifdef PUBLIC_RELEASE
+    string buf;
+    mod::strtool home(buf, sizeof(buf));
+    home = gethomedir();
+    if(home) home += "/";
+    defformatstring(dmp)("%scrash.v%s-%s.%d.dmp", home.str(), CLIENTVERSION.str().str(),
+                         getwcrevision(), totalmillis);
+    path(dmp);
+
+    if (!createminidump(ep, dmp))
+        copystring(dmp, "failed to create dump");
+
+    const char *fmt =
+        "The client has crashed. Please write me an email (t.poechtrager@gmail.com) "
+        "including a full description of how it happened so we can fix this issue in "
+        "future releases. Please attach the created minidump to the email "
+        "(%s). Thanks!";
+
+    fatal(fmt, dmp);
+    return;
+#endif
+//NEW END
     if(!ep) fatal("unknown type");
     EXCEPTION_RECORD *er = ep->ExceptionRecord;
     CONTEXT *context = ep->ContextRecord;
@@ -1024,14 +1111,37 @@ void resetfpshistory()
     fpspos = 0;
 }
 
+static int rfps = 0; //NEW
+
 void updatefpshistory(int millis)
 {
+    //NEW
+    if(maxfps < 0)
+    {
+        static int last = 0, fps = 0;
+        if(totalmillis-last >= 1000)
+        {
+            rfps = fps; fps = 0;
+            last = totalmillis;
+        }
+        else ++fps;
+        return;
+    }
+    //NEW END
     fpshistory[fpspos++] = max(1, min(1000, millis));
     if(fpspos>=MAXFPSHISTORY) fpspos = 0;
 }
 
 void getfps(int &fps, int &bestdiff, int &worstdiff)
 {
+    //NEW
+    if(maxfps < 0)
+    {
+        fps = rfps;
+        bestdiff = worstdiff = 0;
+        if(fps) return;
+    }
+    //NEW END
     int total = fpshistory[MAXFPSHISTORY-1], best = total, worst = total;
     loopi(MAXFPSHISTORY-1)
     {
@@ -1079,6 +1189,49 @@ int getclockmillis()
 
 VAR(numcpus, 1, 1, 16);
 
+//NEW
+MODVARP(benchmarkframe, 0, 0, 1);
+static double totaltime = 0.0;
+static uint totalcounter = 0;
+
+#ifdef __GNUC__
+__inline 
+#endif
+void framebenchmark(bool create = false)
+{
+    if(!benchmarkframe) return;
+    static benchmark bench("frame", true);
+    if(create && !bench.active())
+    {
+        if(vsync) conoutf("benchmarking frames doesn't work properly with vsync enabled");
+        else bench.start();
+    }
+    else
+    {
+        if(bench.active())
+        {
+            bench.calc();
+            double totaltimeold = totaltime;
+            totaltime += bench.gettime();
+            if(totaltime<totaltimeold)
+            {
+                totaltime = 0.0;
+                totalcounter = 0;
+            }
+            else
+            {
+                totalcounter++;
+                conoutf("frame took %.6lf ms | median: %.6lf ms | possible fps: %.0f", 
+                    bench.gettime(), totaltime/double(totalcounter ? totalcounter : 1), 1000.0/bench.gettime());
+            }
+            bench.reset();
+        }
+    }
+}
+
+ICOMMAND(resetframebenchmark, "", (), { totaltime = 0.0; totalcounter = 0.0; });
+//NEW END
+
 #ifdef __APPLE__
 #define main SDL_main
 #endif
@@ -1089,7 +1242,9 @@ int main(int argc, char **argv)
     //atexit((void (__cdecl *)(void))_CrtDumpMemoryLeaks);
     #ifndef _DEBUG
     #ifndef __GNUC__
+    #ifndef __clang__ //NEW
     __try {
+    #endif
     #endif
     #endif
     #endif
@@ -1164,9 +1319,6 @@ int main(int argc, char **argv)
         }
         else gameargs.add(argv[i]);
     }
-
-    execfile("sdos.cfg", false);
-
     initing = NOT_INITING;
 
     numcpus = clamp(SDL_GetCPUCount(), 1, 16);
@@ -1230,6 +1382,8 @@ int main(int argc, char **argv)
     logoutf("init: sound");
     initsound();
 
+    mod::init(); //NEW
+
     logoutf("init: cfg");
     execfile("data/keymap.cfg");
     execfile("data/stdedit.cfg");
@@ -1242,19 +1396,17 @@ int main(int argc, char **argv)
     identflags |= IDF_PERSIST;
     
     initing = INIT_LOAD;
+    execfile(game::wcconfig(), false); //NEW
     if(!execfile(game::savedconfig(), false)) 
     {
         execfile(game::defaultconfig());
         writecfg(game::restoreconfig());
     }
+    mod::chat::setupbinds();           //NEW
+    mod::wcautocheckversion();         //NEW
     execfile(game::autoexec(), false);
-
-    logoutf("init: sdos");
-    for (int i = 0; sdos_scripts[i] != 0; i++)
-    {
-        executestr(sdos_scripts[i]);
-    }
-
+    loadhistory();                     //NEW
+    mod::chat::init();                 //NEW
     initing = NOT_INITING;
 
     identflags &= ~IDF_PERSIST;
@@ -1282,19 +1434,27 @@ int main(int argc, char **argv)
 
     logoutf("init: mainloop");
 
+    //NEW
+    // MSVC requires the following to be a function, otherwise the compiler
+    // complains about destructible objects used in a __try block
+    [](){ conoutf("WC NG version: %s", CLIENTVERSION.str().str()); }();
+    //NEW END
+
     initmumble();
     resetfpshistory();
 
     inputgrab(grabinput = true);
     ignoremousemotion();
 
-    conoutf(stringify_macro(\f0Sauerbraten Day of Sobriety Test Client\f2 v1.5.1));
+    execfile(game::wcautoexec(), false); //NEW
+    mod::event::run(mod::event::STARTUP); //NEW
 
     for(;;)
     {
         static int frames = 0;
         int millis = getclockmillis();
         limitfps(millis, totalmillis);
+        framebenchmark(true); //NEW
         elapsedtime = millis - totalmillis;
         static int timeerr = 0;
         int scaledtime = game::scaletime(elapsedtime) + timeerr;
@@ -1304,6 +1464,7 @@ int main(int argc, char **argv)
         if(game::ispaused()) curtime = 0;
 		lastmillis += curtime;
         totalmillis = millis;
+        atotalmillis = millis; //NEW
         updatetime();
  
         checkinput();
@@ -1323,20 +1484,27 @@ int main(int argc, char **argv)
         recomputecamera();
         updateparticles();
         updatesounds();
+    
+        mod::slice(); //NEW
 
-        if(minimized) continue;
+        if(minimized && !recorder::isrecording()) //NEW !recorder::isrecording()
+        {
+            framebenchmark(); //NEW
+            continue;
+        }
 
         inbetweenframes = false;
         if(mainmenu) gl_drawmainmenu();
         else gl_drawframe();
         swapbuffers();
         renderedframe = inbetweenframes = true;
+        framebenchmark(); //NEW
     }
     
     ASSERT(0);   
     return EXIT_FAILURE;
 
-    #if defined(WIN32) && !defined(_DEBUG) && !defined(__GNUC__)
+    #if defined(WIN32) && !defined(_DEBUG) && !defined(__GNUC__) && !defined(__clang__) //NEW !defined(__clang__)
     } __except(stackdumper(0, GetExceptionInformation()), EXCEPTION_CONTINUE_SEARCH) { return 0; }
     #endif
 }

@@ -1,5 +1,12 @@
 #include "cube.h"
 
+//NEW
+#ifdef PLUGIN
+#define conoutf(...) (void)1
+#define dbgzip 0
+#endif
+//NEW END
+
 enum
 {
     ZIP_LOCAL_FILE_SIGNATURE = 0x04034B50,
@@ -109,7 +116,7 @@ static bool findzipdirectory(FILE *f, zipdirectoryheader &hdr)
     return true;
 }
 
-#ifndef STANDALONE
+#if !defined(STANDALONE) && !defined(PLUGIN) //NEW #ifndef -> !defined() && !defined(PLUGIN)
 VAR(dbgzip, 0, 0, 1);
 #endif
 
@@ -159,9 +166,7 @@ static bool readzipdirectory(const char *archname, FILE *f, int entries, int off
         f.header = hdr.offset;
         f.size = hdr.uncompressedsize;
         f.compressedsize = hdr.compression ? hdr.compressedsize : 0;
-#ifndef STANDALONE
         if(dbgzip) conoutf(CON_DEBUG, "%s: file %s, size %d, compress %d, flags %x", archname, name, hdr.uncompressedsize, hdr.compression, hdr.flags);
-#endif
 
         src += hdr.namelength + hdr.extralength + hdr.commentlength;
     }
@@ -196,7 +201,11 @@ static vector<ziparchive *> archives;
 
 ziparchive *findzip(const char *name)
 {
-    loopv(archives) if(!strcmp(name, archives[i]->name)) return archives[i];
+    streamlocker sl; //NEW
+    loopv(archives) if(!strcmp(name, archives[i]->name))
+    {
+        return archives[i];
+    }
     return NULL;
 }
 
@@ -264,6 +273,7 @@ static void mountzip(ziparchive &arch, vector<zipfile> &files, const char *mount
 
 bool addzip(const char *name, const char *mount = NULL, const char *strip = NULL)
 {
+    if(!mod::ismainthread()) abort(); //NEW
     string pname;
     copystring(pname, name);
     path(pname);
@@ -296,6 +306,7 @@ bool addzip(const char *name, const char *mount = NULL, const char *strip = NULL
     arch->name = newstring(pname);
     arch->data = f;
     mountzip(*arch, files, mount, strip);
+    streamlocker sl; //NEW
     archives.add(arch);
 
     conoutf("added zip %s", pname);
@@ -304,6 +315,7 @@ bool addzip(const char *name, const char *mount = NULL, const char *strip = NULL
      
 bool removezip(const char *name)
 {
+    if(!mod::ismainthread()) abort(); //NEWs
     string pname;
     copystring(pname, name);
     path(pname);
@@ -321,6 +333,7 @@ bool removezip(const char *name)
         return false;
     }
     conoutf("removed zip %s", exists->name);
+    streamlocker sl; //NEW
     archives.removeobj(exists); 
     delete exists;
     return true;
@@ -512,9 +525,7 @@ struct zipstream : stream
                 if(err == Z_STREAM_END) ended = true;
                 else
                 {
-#ifndef STANDALONE
                     if(dbgzip) conoutf(CON_DEBUG, "inflate error: %s", zError(err));
-#endif
                     stopreading(); 
                 }
                 break; 
@@ -527,6 +538,7 @@ struct zipstream : stream
 stream *openzipfile(const char *name, const char *mode)
 {
     for(; *mode; mode++) if(*mode=='w' || *mode=='a') return NULL;
+    streamlocker sl; //NEW
     loopvrev(archives)
     {
         ziparchive *arch = archives[i];
@@ -553,6 +565,7 @@ int listzipfiles(const char *dir, const char *ext, vector<char *> &files)
 {
     size_t extsize = ext ? strlen(ext)+1 : 0, dirsize = strlen(dir);
     int dirs = 0;
+    streamlocker sl; //NEW
     loopvrev(archives)
     {
         ziparchive *arch = archives[i];
@@ -580,7 +593,7 @@ int listzipfiles(const char *dir, const char *ext, vector<char *> &files)
     return dirs;
 }
 
-#ifndef STANDALONE
+#if !defined(STANDALONE) && !defined(PLUGIN) //NEW #ifndef -> !defined() && !defined(PLUGIN)
 ICOMMAND(addzip, "sss", (const char *name, const char *mount, const char *strip), addzip(name, mount[0] ? mount : NULL, strip[0] ? strip : NULL));
 ICOMMAND(removezip, "s", (const char *name), removezip(name));
 #endif

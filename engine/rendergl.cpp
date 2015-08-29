@@ -902,7 +902,7 @@ FVARP(zoomaccel, 0, 0, 1000);
 VARP(zoomautosens, 0, 1, 1);
 FVARP(sensitivity, 1e-3f, 3, 1000);
 FVARP(sensitivityscale, 1e-3f, 1, 1000);
-XIDENT(IDF_SWLACC, FVARP, sdl2_sensitivity_adjust, 1e-3f, 1, 1000);
+MODFVARP(sdl2_sensitivity_adjust, 1e-3f, 1, 1000);
 VARP(invmouse, 0, 0, 1);
 FVARP(mouseaccel, 0, 0, 1000);
  
@@ -2143,6 +2143,8 @@ void gl_drawmainmenu()
     notextureshader->set();
     glDisable(GL_TEXTURE_2D);
 
+    mod::event::run(mod::event::FRAME); //NEW
+
     gl_drawhud();
 }
 
@@ -2352,6 +2354,15 @@ VAR(statrate, 1, 200, 1000);
 
 FVARP(conscale, 1e-3f, 0.33f, 1e3f);
 
+//NEW
+namespace game
+{
+    extern int showtimeleft;
+    extern int showpingdisplay;
+    extern int shownetworkdisplay;
+}
+//NEW END
+
 void gl_drawhud()
 {
     int w = screenw, h = screenh;
@@ -2437,6 +2448,16 @@ void gl_drawhud()
                 roffset += FONTH;
             }
 
+            //NEW
+            //render displays from right to left, otherwise indent of displays may be wrong
+            game::renderping(conw, conh, FONTH);
+            game::rendertimeleft(conw, conh, FONTH);
+            if(recorder::isrecording() && (showfps || game::showtimeleft || (isconnected(false, false) && (game::shownetworkdisplay || game::showpingdisplay)))) roffset += FONTH;
+            game::rendernetwork(conw, conh, screenw, screenh, FONTH);
+            if(!showfps && ((game::showtimeleft || (isconnected(false, false) && (game::shownetworkdisplay || game::showpingdisplay))))) roffset += FONTH;
+            if(game::renderstatsdisplay(conw, conh, FONTH, wallclock ? 220 : 0, roffset) && !wallclock) roffset += FONTH;
+            //NEW END
+
             if(wallclock)
             {
                 if(!walltime) { walltime = time(NULL); walltime -= totalmillis/1000; if(!walltime) walltime++; }
@@ -2455,7 +2476,7 @@ void gl_drawhud()
                     roffset += FONTH;
                 }
             }
-                       
+
             if(editmode || showeditstats)
             {
                 static int laststats = 0, prevstats[8] = { 0, 0, 0, 0, 0, 0, 0 }, curstats[8] = { 0, 0, 0, 0, 0, 0, 0 };
@@ -2518,7 +2539,9 @@ void gl_drawhud()
                     DELETEA(gameinfo);
                 }
             } 
-            
+
+            mod::event::run(mod::event::FRAME); //NEW
+
             glPopMatrix();
         }
 
@@ -2542,6 +2565,8 @@ void gl_drawhud()
     glPopMatrix();
 
     drawcrosshair(w, h);
+    gamemod::renderplayerdisplay(w, h, FONTH, w, h); //NEW
+    gamemod::renderhwdisplay(w, h, FONTH, w, h); //NEW
 
     glDisable(GL_BLEND);
     glDisable(GL_TEXTURE_2D);

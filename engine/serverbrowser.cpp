@@ -25,6 +25,9 @@ SDL_cond *querycond, *resultcond;
 #define RESOLVERTHREADS 2
 #define RESOLVERLIMIT 3000
 
+MODVARP(extinfoserverbrowser, 0, 1, 2); //NEW
+bool isextinfoconnect = false; //NEW
+
 int resolverloop(void * data)
 {
     resolverthread *rt = (resolverthread *)data;
@@ -38,7 +41,8 @@ int resolverloop(void * data)
         SDL_LockMutex(resolvermutex);
         while(resolverqueries.empty()) SDL_CondWait(querycond, resolvermutex);
         rt->query = resolverqueries.pop();
-        rt->starttime = totalmillis;
+        extern atomic<int> atotalmillis; //NEW
+        rt->starttime = atotalmillis;    //NEW totalmillis -> atotalmillis
         SDL_UnlockMutex(resolvermutex);
 
         ENetAddress address = { ENET_HOST_ANY, ENET_PORT_ANY };
@@ -212,11 +216,11 @@ int connectwithtimeout(ENetSocket sock, const char *hostname, const ENetAddress 
     return -1;
 }
  
-XIDENT(IDF_SWLACC, VARP, pingcoloring, 0, 0, 1);
+MODVARP(pingcoloring, 0, 0, 1);
 
 struct pingattempts
 {
-    enum { MAXATTEMPTS = 2 };
+    enum { MAXATTEMPTS = 8 }; //NEW 2 -> 8
 
     int offset, attempts[MAXATTEMPTS];
 
@@ -259,7 +263,7 @@ struct pingattempts
 
 enum { UNRESOLVED = 0, RESOLVING, RESOLVED };
 
-XIDENT(IDF_SWLACC, VARP, keepserverprio, 0, 1, 1);
+MODVARP(keepserverprio, 0, 1, 1);
 
 struct serverinfo : pingattempts
 {
@@ -271,17 +275,31 @@ struct serverinfo : pingattempts
     };
 
     string name, map, sdesc;
-    int port, numplayers, resolved, ping, lastping, nextping;
-    int pings[MAXPINGS];
+    const char *country, *countrycode; //NEW
+    int ping, port, numplayers, resolved, lastping, nextping;
+    int flags, receivetimeout, modsendcount; //NEW
+    int servermod; //NEW
+    float pings[MAXPINGS]; //NEW int -> float
     vector<int> attr;
     ENetAddress address;
     bool keep;
     const char *password;
 
+    //NEW
+    vector<int> playersfollowing;
+    vector<mod::extinfo::playerinfo> playerstmp;
+    vector<mod::extinfo::playerinfo> players;
+    vector<mod::extinfo::extteaminfo> teaminfo;
+    //NEW END
+
+    enum { SERVERMOD_REQUESTED = (1<<0), SERVERMOD_RECEIVED = (1<<1), SERVERMOD_NOREPLY = (1<<2) }; //NEW
+
     serverinfo()
-        : port(-1), numplayers(0), resolved(UNRESOLVED), keep(false), password(NULL)
+        : country(NULL), countrycode(NULL), port(-1), numplayers(0), resolved(UNRESOLVED), flags(0),
+          receivetimeout(0),  modsendcount(0), servermod(0), keep(false), password(NULL)
+        //NEW country(NULL), countrycode(NULL), flags(0), receivetimeout(0), modsendcount(0), servermod(0)
     {
-        name[0] = map[0] = sdesc[0] = '\0';
+        name[0] = map[0] = sdesc[0];
         clearpings();
         setoffset();
     }
@@ -311,6 +329,14 @@ struct serverinfo : pingattempts
     {
         lastping = -1;
     }
+
+    //NEW
+    void lookupcountry()
+    {
+        if(resolved == UNRESOLVED) return;
+        mod::geoip::country(address.host, &country, &countrycode);
+    }
+    //NEW END
 
     void checkdecay(int decay)
     {
@@ -366,7 +392,11 @@ static serverinfo *newserver(const char *name, int port, uint ip = ENET_HOST_ANY
     serverinfo *si = new serverinfo;
     si->address.host = ip;
     si->address.port = server::serverinfoport(port);
-    if(ip!=ENET_HOST_ANY) si->resolved = RESOLVED;
+    if(ip!=ENET_HOST_ANY)
+    { 
+        si->resolved = RESOLVED;
+        si->lookupcountry(); //NEW
+    }
 
     si->port = port;
     if(name) copystring(si->name, name);
@@ -382,7 +412,7 @@ static serverinfo *newserver(const char *name, int port, uint ip = ENET_HOST_ANY
     return si;
 }
 
-void addserver(const char *name, int port, const char *password, bool keep)
+serverinfo *addserver(const char *name, int port, const char *password, bool keep) //NEW void -> serverinfo *
 {
     if(port <= 0) port = server::serverport();
     loopv(servers)
@@ -395,12 +425,13 @@ void addserver(const char *name, int port, const char *password, bool keep)
             s->password = newstring(password);
         }
         if(keep && !s->keep) s->keep = true;
-        return;
+        return s; //NEW return -> return s
     }
     serverinfo *s = newserver(name, port);
-    if(!s) return;
+    if(!s) return NULL; //NEW return -> return NULL
     if(password) s->password = newstring(password);
     s->keep = keep;
+    return s; //NEW
 }
 
 VARP(searchlan, 0, 0, 1);
@@ -418,7 +449,19 @@ template<size_t N> static inline void buildping(ENetBuffer &buf, uchar (&ping)[N
     buf.dataLength = p.length();
 }
 
-void pingservers()
+//NEW
+static bool extinfocallbackadded = false;
+static inline void addextinfocallback()
+{
+    extern void extinforecv(int type, void *p, ENetAddress &addr);
+    if (!extinfocallbackadded)
+    {
+        mod::extinfo::addrecvcallback(&extinforecv);
+        extinfocallbackadded = true;
+    }
+}
+
+static inline void createpingsock()
 {
     if(pingsock == ENET_SOCKET_NULL) 
     {
@@ -433,6 +476,39 @@ void pingservers()
 
         lanpings.setoffset();
     }
+}
+
+MODVARP(randomizepingport, 0, 0, 1);
+
+void rebindpingport()
+{
+    if(!randomizepingport || pingsock == ENET_SOCKET_NULL) return;
+    ENetSocket oldpingsock = pingsock;
+    pingsock = ENET_SOCKET_NULL;
+    createpingsock();
+    enet_socket_destroy(oldpingsock);
+    mod::extinfo::rebindpingport();
+}
+//NEW END
+
+void pingservers()
+{
+#if 0 //NEW moved to createpingsock()
+    if(pingsock == ENET_SOCKET_NULL) 
+    {
+        pingsock = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
+        if(pingsock == ENET_SOCKET_NULL)
+        {
+            lastinfo = totalmillis;
+            return;
+        }
+        enet_socket_set_option(pingsock, ENET_SOCKOPT_NONBLOCK, 1);
+        enet_socket_set_option(pingsock, ENET_SOCKOPT_BROADCAST, 1);
+
+        lanpings.setoffset();
+    }
+#endif
+    createpingsock(); //NEW
 
     ENetBuffer buf;
     uchar ping[MAXTRANS];
@@ -487,17 +563,74 @@ void checkresolver()
             {
                 si.resolved = RESOLVED; 
                 si.address.host = addr.host;
+                si.lookupcountry(); //NEW
                 break;
             }
         }
     }
 }
 
+//NEW
+void checkservermods()
+{
+    if(!game::filterservermod) return;
+
+    static const int maxpings = 35;
+    static const int delay = 250;
+    static const int maxretries = 10;
+
+    static int nextping = 0;
+
+    if (totalmillis < nextping) return;
+
+    int n = maxpings;
+
+    loopv(servers)
+    {
+        serverinfo *si = servers[i];
+
+        if (si->resolved != RESOLVED || si->ping == serverinfo::WAITING) continue;
+        if (si->flags&serverinfo::SERVERMOD_NOREPLY) continue;
+
+        if ((si->flags&serverinfo::SERVERMOD_REQUESTED))
+        {
+            if (!(si->flags&serverinfo::SERVERMOD_RECEIVED) && totalmillis >= si->receivetimeout)
+            {
+                if (si->modsendcount >= maxretries)
+                {
+                    //conoutf("server %s (%s:%d) is not replying to server mod request", si->sdesc, si->name, si->port);
+                    si->flags |= serverinfo::SERVERMOD_NOREPLY;
+                    continue;
+                }
+
+                si->flags &= ~serverinfo::SERVERMOD_REQUESTED;
+            }
+        }
+
+        if (!(si->flags&serverinfo::SERVERMOD_REQUESTED))
+        {
+            if (!n--)
+            {
+                nextping = totalmillis+delay;
+                break;
+            }
+
+            addextinfocallback();
+            mod::extinfo::requestuptime(si->address);
+            si->flags |= serverinfo::SERVERMOD_REQUESTED;
+            si->receivetimeout = totalmillis+((int)si->ping*4);
+            si->modsendcount++;
+        }
+    }
+}
+//NEW END
+
 static int lastreset = 0;
 
 void checkpings()
 {
     if(pingsock==ENET_SOCKET_NULL) return;
+    checkservermods(); //NEW
     enet_uint32 events = ENET_SOCKET_WAIT_RECEIVE;
     ENetBuffer buf;
     ENetAddress addr;
@@ -508,7 +641,7 @@ void checkpings()
     while(enet_socket_wait(pingsock, &events, 0) >= 0 && events)
     {
         int len = enet_socket_receive(pingsock, &addr, &buf, 1);
-        if(len <= 0) return;  
+        if(len <= 0) return;
         ucharbuf p(ping, len);
         int millis = getint(p);
         serverinfo *si = NULL;
@@ -534,8 +667,67 @@ void checkpings()
         filtertext(si->map, text, false);
         getstring(text, p);
         filtertext(si->sdesc, text);
+        //NEW
+        extern serverinfo *selectedserver;
+        bool isselectedserver = (selectedserver == si);
+        if(isextinfoconnect || ((extinfoserverbrowser && (isselectedserver || extinfoserverbrowser == 2)) && (si->numplayers > 0 || (!si->players.empty() && si->numplayers <= 0))))
+        {
+            addextinfocallback();
+            if (isextinfoconnect || isselectedserver) mod::extinfo::requestteaminfo(si->address);
+            mod::extinfo::requestplayers(si->address);
+        }
+        //NEW END
     }
 }
+
+//NEW
+void extinforecv(int type, void *p, ENetAddress &addr)
+{
+    serverinfo *si = NULL;
+    loopv(servers) if(addr.host == servers[i]->address.host && addr.port == servers[i]->address.port) { si = servers[i]; break; }
+    if (!si) return;
+    switch (type)
+    {
+        case EXT_PLAYERSTATS_RESP_IDS:
+        {
+            si->playersfollowing.setsize(0);
+            int *cns = (int*)p;
+            while (*cns != -1) { si->playersfollowing.add(*cns); cns++; }
+            si->playerstmp.setsize(0);
+            if (si->playersfollowing.empty()) si->players.setsize(0);
+            break;
+        }
+        case EXT_PLAYERSTATS_RESP_STATS:
+        {
+            auto *ep = (mod::extinfo::playerv2*)p;
+            int index = si->playersfollowing.find(ep->cn);
+            if (index < 0) break;
+            si->playerstmp.add(ep);
+            si->playersfollowing.remove(index);
+            if (si->playersfollowing.empty()) si->players = si->playerstmp;
+            break;
+        }
+        case EXT_TEAMSCORE:
+        {
+            mod::extinfo::extteaminfo *ti = (mod::extinfo::extteaminfo*)p;
+            if (!ti)
+            {
+                si->teaminfo.setsize(0);
+                return;
+            }
+            si->teaminfo.add(*ti);
+            break;
+        }
+        case EXT_UPTIME:
+        {
+            si->servermod = *(((int**)p)[1]);
+            si->flags |= serverinfo::SERVERMOD_RECEIVED;
+            si->flags &= ~serverinfo::SERVERMOD_NOREPLY;
+            break;
+        }
+    }
+}
+//NEW END
 
 void sortservers()
 {
@@ -583,15 +775,18 @@ const char *showservers(g3d_gui *cgui, uint *header, int pagemin, int pagemax)
         loopi(10)
         {
             if(!game::serverinfostartcolumn(cgui, i)) break;
+            int notshown = 0;
             for(int j = start; j < end; j++)
             {
-                if(!i && j+1 - start >= pagemin && (j+1 - start >= pagemax || cgui->shouldtab())) { end = j; break; }
+                if(!i && j+1 - start - notshown >= pagemin && (j+1 - start - notshown >= pagemax || cgui->shouldtab())) { end = j; break; } //NEW - notshown
                 serverinfo &si = *servers[j];
                 const char *sdesc = si.sdesc;
                 if(si.address.host == ENET_HOST_ANY) sdesc = "[unknown host]";
                 else if(si.ping == serverinfo::WAITING) sdesc = "[waiting for response]";
-                if(game::serverinfoentry(cgui, i, si.name, si.port, sdesc, si.map, sdesc == si.sdesc ? si.ping : -1, si.attr, si.numplayers))
+                bool shown; //NEW
+                if(game::serverinfoentry(cgui, shown, i, si.name, si.port, sdesc, si.map, sdesc == si.sdesc ? si.ping : (float)-1, si.attr, si.numplayers, si.servermod, si.country, si.countrycode)) //NEW shown  si.servermod, si.country, si.countrycode
                     sc = &si;
+                if(!shown) notshown++; //NEW
             }
             game::serverinfoendcolumn(cgui, i);
         }
@@ -603,9 +798,241 @@ const char *showservers(g3d_gui *cgui, uint *header, int pagemin, int pagemax)
     return "connectselected";
 }
 
+//NEW
+
+static int lastextping = 0;
+
+void cleanupextinfo()
+{
+    selectedserver = NULL;
+    game::disableradar = false;
+    isextinfoconnect = false;
+    lastextping = 0;
+}
+
+void showextinfo(g3d_gui &g, uint *header, mod::strtool &command)
+{
+    if (!selectedserver)
+    {
+        cleargui:;
+        command = "cleargui";
+        cleanupextinfo();
+        return;
+    }
+
+    static const serverinfo *lastselectedserver = selectedserver;
+
+    if (lastselectedserver != selectedserver)
+    {
+        lastextping = 0;
+        lastselectedserver = selectedserver;
+    }
+
+    serverinfo *s = NULL;
+
+    loopv(servers)
+    {
+        serverinfo *si = servers[i];
+
+        if (si == selectedserver)
+        {
+            s = si;
+            break;
+        }
+    }
+
+    if (!s) goto cleargui;
+
+    bool waiting = false;
+
+    if (s->resolved != RESOLVED)
+    {
+        checkresolver();
+        waiting = (s->resolved != RESOLVED);
+    }
+
+    if (!waiting && (!lastextping || totalmillis-lastextping >= servpingrate))
+    {
+        createpingsock();
+
+        ENetBuffer buf;
+        uchar ping[MAXTRANS];
+        ucharbuf p(ping, sizeof(ping));
+        putint(p, s->addattempt(totalmillis));
+
+        buf.data = ping;
+        buf.dataLength = p.length();
+        enet_socket_send(pingsock, &s->address, &buf, 1);
+
+        lastextping = totalmillis;
+    }
+
+    checkpings();
+
+    if (!waiting && s->ping == serverinfo::WAITING) waiting = true;
+
+    mod::extinfo::renderplayerpreview(g, command, s->address, waiting, s->password, s->ping, s->name, s->port, s->sdesc, s->attr.length(),
+                                      s->attr.getbuf(), s->teaminfo.length(), s->teaminfo.getbuf(), s->map, s->numplayers, &s->players);
+}
+
+void loopextinfoplayers(const char *name, const char *country, const char *callbackargs, const char *callbackcode)
+{
+    string findbuf, countrybuf, playernamebuf, countrynamebuf;
+    mod::strtool find(findbuf, sizeof(findbuf));
+    mod::strtool findcountry(countrybuf, sizeof(findbuf));
+    mod::strtool playername(playernamebuf, sizeof(playernamebuf));
+    mod::strtool countryname(countrynamebuf, sizeof(countrynamebuf));
+
+    find = name;
+    findcountry = country;
+
+    find.upperstring();
+    findcountry.upperstring();
+
+    uint callbackid;
+    uint scriptcallbackid = mod::event::install(mod::event::INTERNAL_CALLBACK, callbackargs, callbackcode, &callbackid);
+    uint cbevent = callbackid<<16|mod::event::INTERNAL_CALLBACK;
+
+    if(!scriptcallbackid) return;
+
+    loopv(servers)
+    {
+        serverinfo *si = servers[i];
+
+        loopvk(si->players)
+        {
+            mod::extinfo::playerinfo &p = si->players[k];
+            mod::extinfo::playerv2 &ep = p.ep;
+
+            if (!find.empty())
+            {
+                playername = ep.getname();
+                playername.upperstring();
+            }
+
+            if (find.empty() || playername.find(find))
+            {
+                if (!findcountry.empty())
+                {
+                    if (p.countrycode)
+                    {
+                        countryname = p.countrycode;
+                        countryname.upperstring();
+
+                        if (countryname != findcountry) continue; // require full equality for country code names
+                    }
+                    else if (findcountry != "??") continue;
+                }
+
+                if (si->attr.length() < 5) goto nextserver;
+
+                const int &protocol = si->attr[0];
+                const int &gamemode = si->attr[1];
+                const int &secleft = si->attr[2];
+                const int &maxplayers = si->attr[3];
+                const int &mastermode = si->attr[4];
+
+                if (!gamemod::validprotocolversion(protocol)) goto nextserver;
+
+                int gamepaused = si->attr.length()>=6 ? si->attr[5]!=0 : 0;
+                int gamespeed = si->attr.length()>=7 ? si->attr[6] : 100;
+
+                static const int MAX_SERVER_DESC_LEN = 30;
+
+                int c = si->sdesc[MAX_SERVER_DESC_LEN];
+                si->sdesc[MAX_SERVER_DESC_LEN] = 0;
+
+#ifndef ENABLE_IPS
+                static const char *args = "sdddsdddddsddddssddddddddddss";
+#else
+                static const char *args = "sdddsdddddsddddssddddddddddssuuuu";
+#endif
+
+                mod::event::run(cbevent, args, si->name, si->address.host, si->address.port-1, si->ping, si->sdesc,
+                                secleft, si->numplayers, maxplayers, mastermode, gamemode, si->map, gamepaused, gamespeed,
+                                ep.cn, ep.ping, ep.getname(), ep.team, ep.frags, ep.flags, ep.deaths, ep.teamkills,
+                                ep.acc, ep.health, ep.armour, ep.gunselect, ep.priv, ep.state, p.countrycode ? p.countrycode : "",
+                                p.country ? p.country : "", ep.ip.ia[0], ep.ip.ia[1], ep.ip.ia[2], ep.ip.ia[3]);
+
+                si->sdesc[MAX_SERVER_DESC_LEN] = c;
+
+                // hostname hostint port serverping serverdesc secleft numplayers maxplayers mastermode gamemode mapname gamepaused gamespeed
+                // cn ping playername playerteam frags flags deaths teamkills acc health armour gunselect priv state playercountrycode playercountry
+                // ip byte 1, ip byte 2, ip byte3, ip byte4
+            }
+        }
+
+        nextserver:;
+    }
+
+    mod::event::uninstall(scriptcallbackid);
+}
+COMMAND(loopextinfoplayers, "ssss");
+
+void getextinfoplayercount()
+{
+    int playercount = 0;
+
+    loopv(servers)
+    {
+        serverinfo *si = servers[i];
+
+        if (si->attr.length() < 5) continue;
+
+        const int &protocol = si->attr[0];
+        if (!gamemod::validprotocolversion(protocol)) continue;
+
+        playercount += si->players.length();
+    }
+
+    intret(playercount);
+}
+COMMAND(getextinfoplayercount, "");
+
+void processservers()
+{
+    int ov = extinfoserverbrowser;
+    extinfoserverbrowser = 2;
+    refreshservers();
+    extinfoserverbrowser = ov;
+}
+COMMAND(processservers, "");
+
+static inline void installextinfomenu()
+{
+    extern bool menuexists(const char *name);
+    if (!menuexists("extinfo"))
+        execute("newgui \"extinfo\" [ guistayopen [ guinoautotab [ guiextinfo ] ] ]"); // hack to get extinfo browser working, if the menu isn't installed...
+}
+
+void extinfoconnect(const char *name, const int *port, const char *pw)
+{
+    serverinfo *si = addserver(name, *port, pw[0] ? pw : NULL);
+    if (!si) return;
+    installextinfomenu();
+    selectedserver = si;
+    isextinfoconnect = true;
+    lastextping = 0;
+    game::disableradar = true;
+    showgui("extinfo");
+}
+
+COMMAND(extinfoconnect, "sis");
+//NEW END
+
 void connectselected()
 {
     if(!selectedserver) return;
+    //NEW
+    if(extinfoserverbrowser)
+    {
+        lastextping = 0;
+        game::disableradar = true;
+        installextinfomenu();
+        showgui("extinfo");
+        return;
+    }
+    //NEW END
     connectserv(selectedserver->name, selectedserver->port, selectedserver->password);
     selectedserver = NULL;
 }
@@ -622,12 +1049,31 @@ void clearservers(bool full = false)
 
 #define RETRIEVELIMIT 20000
 
-void retrieveservers(vector<char> &data)
+const char *curmastername = NULL; //NEW
+int curmasterport = 0; //NEW
+
+void retrieveservers(const char *master, vector<char> &data) //NEW master
 {
+    //NEW
+    // use a variable-shadowing trick to prevent changing too much original code
+    string mastername = "";
+    int masterport;
+    const char *port = strstr(master, ":");
+    if(!port)
+    {
+        mod::erroroutf_r("invald master server: %s", master);
+        return;
+    }
+    copystring(mastername, master, clamp(size_t(port-master+1), size_t(0), sizeof(mastername)));
+    masterport = atoi(++port);
+    curmastername = mastername;
+    curmasterport = masterport;
+    //NEW END
     ENetSocket sock = connectmaster(true);
     if(sock == ENET_SOCKET_NULL) return;
 
-    extern char *mastername;
+    //extern char *mastername; //NEW commented
+
     defformatstring(text)("retrieving servers from %s... (esc to abort)", mastername);
     renderprogress(0, text);
 
@@ -678,16 +1124,209 @@ void retrieveservers(vector<char> &data)
 
 bool updatedservers = false;
 
+//NEW
+MODVARP(allowmasterserverscripts, 0, 0, 1);
+void parsemasterreply(const char *reply, const char *mastername)
+{
+    int serverport, servercount = 0;
+    string cmd, serverip;
+    while(true)
+    {
+        if(sscanf(reply, "%50s %100s %d", cmd, serverip, &serverport) < 3) goto invalidcommand;
+        if(strcmp(cmd, "addserver")) goto invalidcommand;
+        addserver(serverip, serverport);
+        servercount++;
+        reply = strchr(reply, '\n');
+        if(!reply || !*++reply) break;
+    }
+    conoutf("received %d server%s from master server%s", servercount, mod::plural(servercount), mastername);
+    return;
+    invalidcommand:
+    mod::erroroutf_r("master server%s sent an invalid command - executing scripts from master server is disabled in WC for security reasons", mastername);
+    conoutf("if you want to enable them anyway, type '/allowmasterserverscripts 1' - but be warned, the master server owner can controll your client");
+}
+
+static const int MAXMASTERSERVERS = 100;
+static vector<mod::strtool> masterservers;
+
+//
+// required in server.cpp
+// do NOT reset it to false once it was set to true
+//
+bool havemultiplemasterservers = false;
+
+static void addmasterserver(const char *server, int *port)
+{
+    extern char *mastername;
+    extern int masterport;
+    if(!*server)
+    {
+        mod::erroroutf_r("no master server given");
+        intret(0);
+        return;
+    }
+    if(*port > 0xFFFF || *port < 0)
+    {
+        mod::erroroutf_r("invalid port given");
+        intret(0);
+        return;
+    }
+    if(!*port) *port = server::masterport();
+    if(strstr(server, ":"))
+    {
+        mod::erroroutf_r("master server should not contain ':'");
+        intret(0);
+        return;
+    }
+    if(masterservers.length()+1/*std master*/ >= MAXMASTERSERVERS)
+    {
+        mod::erroroutf_r("you may only add up to %d master servers", MAXMASTERSERVERS);
+        intret(0);
+        return;
+    }
+    mod::strtool master;
+    master << server << ":" << *port;
+    if(masterservers.find(master) >= 0 || (!strcmp(mastername, server) && masterport == *port))
+    {
+        mod::erroroutf_r("master server (%s) is already added", master.str());
+        intret(0);
+        return;
+    }
+    masterservers.add(master);
+    havemultiplemasterservers = true;
+    conoutf("added master server (%s)", master.str());
+    intret(1);
+}
+
+static void delmasterserver(const char *server, int *port)
+{
+    if(!*server)
+    {
+        mod::erroroutf_r("no master server given");
+        intret(0);
+        return;
+    }
+    if(!strcmp(server, "-1"))
+    {
+        masterservers.shrink(0);
+        conoutf("removed all master servers");
+        intret(1);
+        return;
+    }
+    if(!*port) *port = server::masterport();
+    mod::strtool master;
+    master << server << ":" << *port;
+    int index = masterservers.find(master);
+    if(index < 0)
+    {
+        mod::erroroutf_r("master server (%s) is not added", master.str());
+        intret(0);
+        return;
+    }
+    masterservers.remove(index);
+    conoutf("removed master server (%s)", master.str());
+    intret(1);
+}
+
+static inline void printmaster(int &num, const char *server, int port, const char *desc)
+{
+    conoutf("%d. master server: %s  port: %d%s", ++num, server, port, desc);
+}
+
+static void listmasterservers()
+{
+    int num = 0;
+    int count = masterservers.length()+1;
+    conoutf("listing %d master server%s:", count, mod::plural(count));
+    {
+        extern char *mastername;
+        extern int masterport;
+        printmaster(num, mastername, masterport, "  (/mastername)");
+    }
+    loopv(masterservers)
+    {
+        mod::strtool &server = masterservers[i];
+        mod::strtool *strs;
+        if(server.split(":", &strs) > 1)
+        {
+            mod::strtool &server = strs[0];
+            mod::strtool &port = strs[1];
+            printmaster(num, server.str(), port.tonumber<int>(0, 1, 0xFFFF), "");
+        }
+        delete[] strs;
+    }
+}
+
+void writemasterserverscfg(stream *f)
+{
+    if(masterservers.empty()) return;
+    f->printf("\n// additional master servers\n");
+    loopv(masterservers)
+    {
+        mod::strtool &server = masterservers[i];
+        mod::strtool *strs;
+        if(server.split(":", &strs) > 1)
+        {
+            mod::strtool &server = strs[0];
+            mod::strtool &port = strs[1];
+            f->printf("addmasterserver %s %d\n", escapestring(server.str()), port.tonumber<int>(0, 1, 0xFFFF));
+        }
+        delete[] strs;
+    }
+}
+
+COMMAND(addmasterserver, "si");
+COMMAND(delmasterserver, "si");
+COMMAND(listmasterservers, "");
+//NEW END
+
 void updatefrommaster()
 {
     vector<char> data;
+    //NEW
+    {
+        extern char *mastername;
+        extern int masterport;
+        static mod::strtool stdmaster;
+        stdmaster.clear();
+        stdmaster << mastername << ":" << masterport;
+        masterservers.add(stdmaster);
+    }
+    bool haveresponse = false;
+    loopv(masterservers)
+    {
+        mod::strtool &master = masterservers[i];
+        static mod::strtool mastername;
+        mastername.clear();
+        data.setsize(0);
+        retrieveservers(master.str(), data);
+        if(masterservers.length() > 1) mastername << " (" << master << ")";
+        if(data.empty()) conoutf("master server%s not replying", mastername.str());
+        else
+        {
+            if(!haveresponse)
+            {
+                clearservers();
+                haveresponse = true;
+            }
+            if(!allowmasterserverscripts) parsemasterreply(data.getbuf(), mastername.str());
+            else execute(data.getbuf());
+        }
+    }
+    masterservers.pop(); //pop std master
+    curmastername = NULL;
+    if(!haveresponse) return;
+    //NEW END
+#if 0
     retrieveservers(data);
     if(data.empty()) conoutf("master server not replying");
     else
     {
         clearservers();
-        execute(data.getbuf());
+        if(!allowmasterserverscripts) parsemasterreply(data.getbuf()); //NEW
+        else execute(data.getbuf());
     }
+#endif
     refreshservers();
     updatedservers = true;
 }

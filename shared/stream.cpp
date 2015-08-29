@@ -232,6 +232,29 @@ done:
 #include <dirent.h>
 #endif
 
+//NEW
+#if !defined(PLUGIN) && !defined(STANDALONE)
+SDL_mutex *smutex = NULL;
+static struct streammutex
+{
+    streammutex() { if(!(smutex = SDL_CreateMutex())) abort(); }
+    ~streammutex() { SDL_DestroyMutex(smutex); }
+} streammutex;
+
+void lockstream()
+{
+    SDL_mutexP(smutex);
+}
+
+void unlockstream()
+{
+    SDL_mutexV(smutex);
+    mod::deallocatethreadstorage(0);
+}
+#endif //!PLUGIN && !STANDALONE
+
+//NEW END
+
 string homedir = "";
 struct packagedir
 {
@@ -242,7 +265,8 @@ vector<packagedir> packagedirs;
 
 char *makerelpath(const char *dir, const char *file, const char *prefix, const char *cmd)
 {
-    static string tmp;
+    static string localtmp; //NEW tmp -> localtmp
+    char *tmp = (char*)mod::allocatethreadstorage(0, sizeof(localtmp), true, localtmp); //NEW
     if(prefix) copystring(tmp, prefix);
     else tmp[0] = '\0';
     if(file[0]=='<')
@@ -251,7 +275,7 @@ char *makerelpath(const char *dir, const char *file, const char *prefix, const c
         if(end)
         {
             size_t len = strlen(tmp);
-            copystring(&tmp[len], file, min(sizeof(tmp)-len, size_t(end+2-file)));
+            copystring(&tmp[len], file, min(sizeof(localtmp)-len, size_t(end+2-file))); //NEW sizeof(localtmp) instead of sizeof(tmp)
             file = end+1;
         }
     }
@@ -313,7 +337,8 @@ char *path(char *s)
 
 char *path(const char *s, bool copy)
 {
-    static string tmp;
+    static string localtmp; //NEW tmp -> localtmp
+    char *tmp = (char*)mod::allocatethreadstorage(0, sizeof(localtmp), true, localtmp); //NEW
     copystring(tmp, s);
     path(tmp);
     return tmp;
@@ -323,7 +348,8 @@ const char *parentdir(const char *directory)
 {
     const char *p = directory + strlen(directory);
     while(p > directory && *p != '/' && *p != '\\') p--;
-    static string parent;
+    static string localparent; //NEW parent -> localparent
+    char *parent = (char*)mod::allocatethreadstorage(0, sizeof(localparent), true, localparent); //NEW
     size_t len = p-directory+1;
     copystring(parent, directory, len);
     return parent;
@@ -346,7 +372,8 @@ bool createdir(const char *path)
     size_t len = strlen(path);
     if(path[len-1]==PATHDIV)
     {
-        static string strip;
+        static string localstrip; //NEW strip -> localstrip
+        char *strip = (char*)mod::allocatethreadstorage(0, sizeof(localstrip), true, localstrip); //NEW
         path = copystring(strip, path, len);
     }
 #ifdef WIN32
@@ -391,15 +418,35 @@ bool subhomedir(char *dst, int len, const char *src)
 
 const char *sethomedir(const char *dir)
 {
+//NEW
+#ifndef STANDALONE
+    if(!mod::ismainthread()) abort();
+#endif //!STANDALONE
+//NEW END
     string pdir;
     copystring(pdir, dir);
     if(!subhomedir(pdir, sizeof(pdir), dir) || !fixpackagedir(pdir)) return NULL;
+    streamlocker sl; //NEW
     copystring(homedir, pdir);
     return homedir;
 }
 
+//NEW
+const char *gethomedir()
+{
+    // return homedir; //NEW commented
+    return (const char*)mod::allocatethreadstorage(0, sizeof(homedir), true, homedir, true); //NEW
+}
+//NEW END
+
+
 const char *addpackagedir(const char *dir)
 {
+//NEW
+#ifndef STANDALONE
+    if(!mod::ismainthread()) abort();
+#endif //!STANDALONE
+//NEW END
     string pdir;
     copystring(pdir, dir);
     if(!subhomedir(pdir, sizeof(pdir), dir) || !fixpackagedir(pdir)) return NULL;
@@ -412,6 +459,7 @@ const char *addpackagedir(const char *dir)
         if(filter > pdir && filter[-1] == PATHDIV && filter[len] == PATHDIV) break;
         filter += len;
     }    
+    streamlocker sl; //NEW
     packagedir &pf = packagedirs.add();
     pf.dir = filter ? newstring(pdir, filter-pdir) : newstring(pdir);
     pf.dirlen = filter ? filter-pdir : strlen(pdir);
@@ -422,7 +470,9 @@ const char *addpackagedir(const char *dir)
 
 const char *findfile(const char *filename, const char *mode)
 {
-    static string s;
+    static string locals; //NEW s -> locals
+    char *s = (char*)mod::allocatethreadstorage(0, sizeof(locals), true, locals); //NEW
+    streamlocker sl; //NEW
     if(homedir[0])
     {
         formatstring(s)("%s%s", homedir, filename);
@@ -457,7 +507,7 @@ const char *findfile(const char *filename, const char *mode)
 bool listdir(const char *dirname, bool rel, const char *ext, vector<char *> &files)
 {
     size_t extsize = ext ? strlen(ext)+1 : 0;
-    #ifdef WIN32
+#ifdef WIN32
     defformatstring(pathname)(rel ? ".\\%s\\*.%s" : "%s\\*.%s", dirname, ext ? ext : "*");
     WIN32_FIND_DATA FindFileData;
     HANDLE Find = FindFirstFile(pathname, &FindFileData);
@@ -516,6 +566,7 @@ int listfiles(const char *dir, const char *ext, vector<char *> &files)
     int dirs = 0;
     if(listdir(dirname, true, ext, files)) dirs++;
     string s;
+    streamlocker sl; //NEW
     if(homedir[0])
     {
         formatstring(s)("%s%s", homedir, dirname);
@@ -696,7 +747,7 @@ struct filestream : stream
     }
 };
 
-#ifndef STANDALONE
+#if !defined(STANDALONE) && !defined(PLUGIN) //NEW #ifndef -> !defined() && && !defined(PLUGIN)
 VAR(dbggz, 0, 0, 1);
 #endif
 
@@ -830,7 +881,7 @@ struct gzstream : stream
     void finishreading()
     {
         if(!reading) return;
-#ifndef STANDALONE
+#if !defined(STANDALONE) && !defined(PLUGIN) //NEW #ifndef -> !defined() && && !defined(PLUGIN)
         if(dbggz)
         {
             uint checkcrc = 0, checksize = 0;
@@ -1040,7 +1091,7 @@ struct utf8stream : stream
         for(; *mode; mode++)
         {
             if(*mode=='r') { reading = true; break; }
-            else if(*mode=='w') { writing = true; break; }
+            else if(*mode=='w' || *mode=='a') { writing = true; break; } //NEW  || *mode=='a'
         }
         if(!reading && !writing) return false;
        

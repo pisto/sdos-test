@@ -371,6 +371,8 @@ enet_peer_on_disconnect (ENetPeer * peer)
 void
 enet_peer_reset (ENetPeer * peer)
 {
+    memset(&peer -> bandwidthStats, 0, sizeof(peer -> bandwidthStats)); //NEW
+
     enet_peer_on_disconnect (peer);
         
     peer -> outgoingPeerID = ENET_PROTOCOL_MAXIMUM_PEER_ID;
@@ -556,6 +558,10 @@ enet_peer_disconnect (ENetPeer * peer, enet_uint32 data)
     else
     {
         enet_host_flush (peer -> host);
+        //NEW
+        if (peer -> bandwidthStats . freecallback)
+            peer -> bandwidthStats . freecallback ( & peer -> bandwidthStats . data );
+        //NEW END
         enet_peer_reset (peer);
     }
 }
@@ -604,6 +610,7 @@ enet_peer_queue_acknowledgement (ENetPeer * peer, const ENetProtocol * command, 
       return NULL;
 
     peer -> outgoingDataTotal += sizeof (ENetProtocolAcknowledge);
+    peer -> bandwidthStats . outgoingDataTotal += sizeof (ENetProtocolAcknowledge); //NEW
 
     acknowledgement -> sentTime = sentTime;
     acknowledgement -> command = * command;
@@ -618,7 +625,10 @@ enet_peer_setup_outgoing_command (ENetPeer * peer, ENetOutgoingCommand * outgoin
 {
     ENetChannel * channel = & peer -> channels [outgoingCommand -> command.header.channelID];
     
-    peer -> outgoingDataTotal += enet_protocol_command_size (outgoingCommand -> command.header.command) + outgoingCommand -> fragmentLength;
+    int OutgoingData = enet_protocol_command_size (outgoingCommand -> command.header.command) + outgoingCommand -> fragmentLength; //NEW int OutgoingData = 
+
+    peer -> outgoingDataTotal += OutgoingData;
+    peer -> bandwidthStats . outgoingDataTotal += OutgoingData; //NEW
 
     if (outgoingCommand -> command.header.channelID == 0xFF)
     {

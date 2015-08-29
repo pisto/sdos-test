@@ -6,7 +6,7 @@
 #ifdef NULL
 #undef NULL
 #endif
-#define NULL 0
+#define NULL nullptr //NEW c++11 nullptr instead of 0
 
 typedef unsigned char uchar;
 typedef unsigned short ushort;
@@ -28,36 +28,44 @@ typedef unsigned long long int ullong;
 
 #ifdef __GNUC__
 #define UNUSED __attribute__((unused))
+#define NORETURN __attribute__((noreturn))                      //NEW
+#define WEAK __attribute__((weak))                              //NEW
+#define NOINLINE __attribute__((noinline))                      //NEW
+#define INLINE inline __attribute__((always_inline))            //NEW
+#define HOT __attribute__((hot))                                //NEW
+#define UNREACHABLE() __builtin_unreachable()                   //NEW
+#define _UNREACHABLE(cond) if((cond)) __builtin_trap()          //NEW
+#define __UNREACHABLE(cond) if((cond)) __builtin_unreachable()  //NEW
 #else
 #define UNUSED
+#define NORETURN                                                //NEW
+#define WEAK                                                    //NEW
+#define NOINLINE                                                //NEW
+#define INLINE                                                  //NEW
+#define HOT                                                     //NEW
+#define UNREACHABLE() abort()                                   //NEW
+#define _UNREACHABLE(cond) if((cond)) abort()                   //NEW
+#define __UNREACHABLE(cond) if((cond)) abort()                  //NEW
 #endif
 
-#include <new>
-
-#define GCC_VERSION_AT_LEAST(major, minor, patch) \
-    (defined(__GNUC__) && \
-    (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__) >= \
-    (major * 10000 + minor * 100 + patch))
-
-#define CLANG_VERSION_AT_LEAST(major, minor, patch) \
-    (defined(__clang__) && \
-    (__clang_major__ * 10000 + __clang_minor__ * 100 + __clang_patchlevel__) >= \
-    (major * 10000 + minor * 100 + patch))
-
-#define ICC_VERSION_AT_LEAST(major, minor, patch) \
-    (defined(__INTEL_COMPILER) && \
-    ((__INTEL_COMPILER * 10000 + __INTEL_COMPILER_UPDATE) >= \
-    ((major * 100 + minor) * 10000) + patch))
-
-#define stringify_(x)		#x
-#define stringify_macro(x)	stringify_(x)
-
-
-#if __cplusplus < 201103L
-#define decltype typeof
+#ifndef USE_STD_NEW //NEW
+//NEW throw()
+void operator delete(void *p) throw();
+void operator delete(void *p, size_t) throw();   //NEW
+void operator delete[](void *p) throw();
+void operator delete[](void *p, size_t) throw(); //NEW
+inline void *operator new(size_t, void *p) throw() { return p; }
+inline void *operator new[](size_t, void *p) throw() { return p; }
+inline void operator delete(void *, void *) throw() {}
+inline void operator delete[](void *, void *) throw() {}
 #else
-#define CPP11
-#endif
+#include <new>
+#endif //!USE_STD_NEW
+
+//NEW
+#define TOKENPASTE_(x, y) x ## y
+#define TOKENPASTE(x, y) TOKENPASTE_(x, y)
+//NEW END
 
 #ifdef swap
 #undef swap
@@ -76,17 +84,17 @@ static inline void swap(T &a, T &b)
 #undef min
 #endif
 template<class T>
-static inline T max(T a, T b)
+constexpr T max(T a, T b) //NEW constexpr instead of static inline
 {
     return a > b ? a : b;
 }
 template<class T>
-static inline T min(T a, T b)
+constexpr T min(T a, T b) //NEW constexpr instead of static inline
 {
     return a < b ? a : b;
 }
 template<class T, class U>
-static inline T clamp(T a, U b, U c)
+constexpr T clamp(T a, U b, U c) //NEW constexpr instead of static inline
 {
     return max(T(b), min(a, T(c)));
 }
@@ -126,11 +134,15 @@ static inline T clamp(T a, U b, U c)
 #endif
 
 #ifndef __GNUC__
+#ifndef __clang__ //NEW
 #pragma warning (3: 4189)       // local variable is initialized but not referenced
+#endif
 #pragma warning (disable: 4244) // conversion from 'int' to 'float', possible loss of data
 #pragma warning (disable: 4267) // conversion from 'size_t' to 'int', possible loss of data
 #pragma warning (disable: 4355) // 'this' : used in base member initializer list
 #pragma warning (disable: 4996) // 'strncpy' was declared deprecated
+//NEW
+#pragma warning (disable: 4351) // elements of array '...' will be default initialized
 #endif
 
 #define strcasecmp _stricmp
@@ -194,6 +206,7 @@ inline char *newstring(const char *s)           { size_t l = strlen(s); char *d 
 #define loopvj(v)   for(int j = 0; j<(v).length(); j++)
 #define loopvk(v)   for(int k = 0; k<(v).length(); k++)
 #define loopvrev(v) for(int i = (v).length()-1; i>=0; i--)
+#define loopvrevj(v) for(int j = (v).length()-1; j>=0; j--) //NEW
 
 template <class T>
 struct databuf
@@ -463,16 +476,27 @@ static inline bool htcmp(GLuint x, GLuint y)
 }
 #endif
 
-template <class T> struct vector
+template <class T, bool GLOBAL=false> struct vector //NEW  bool GLOBAL=false
 {
     static const int MINSIZE = 8;
 
     T *buf;
     int alen, ulen;
 
-    vector() : buf(NULL), alen(0), ulen(0)
+    // vector() : buf(NULL), alen(0), ulen(0) {} //NEW commented
+
+    //NEW
+    vector(int n) : buf(NULL), alen(0), ulen(0)
     {
+        if(n) growbuf(n);
     }
+
+    vector()
+    {
+        if(GLOBAL) return;
+        buf = NULL; alen = 0; ulen = 0;
+    }
+    //NEW END
 
     vector(const vector &v) : buf(NULL), alen(0), ulen(0)
     {
@@ -495,6 +519,39 @@ template <class T> struct vector
         new (&buf[ulen]) T(x);
         return buf[ulen++];
     }
+
+    //NEW
+    void add(const void *x, int n)
+    {
+        if(ulen+n>=alen) growbuf(ulen+n);
+        memcpy(&buf[ulen], x, n);
+        ulen += n;
+    }
+
+    void resize(int n = -1, const T x = T())
+    {
+        bool reducebuf = (n==-1);
+        if(reducebuf) n = ulen;
+        ASSERT(n>=0);
+        if(!n)
+        {
+            shrink(0);
+            if(buf) delete[] (uchar *)buf;
+            disown();
+            return;
+        }
+        while(ulen>n) drop();
+        if(alen<n || reducebuf)
+        {
+            uchar *newbuf = new uchar[n*sizeof(T)];
+            memcpy(newbuf, buf, n*sizeof(T));
+            if(buf) delete[] (uchar *)buf;
+            buf = (T *)newbuf;
+            alen = n;
+        }
+        while(ulen<n) add(x);
+    }
+    //NEW END
 
     T &add()
     {
@@ -547,6 +604,11 @@ template <class T> struct vector
 
     void deletecontents() { while(!empty()) delete   pop(); }
     void deletearrays() { while(!empty()) delete[] pop(); }
+
+    //NEW (range based for)
+    T *begin() { return buf ? &buf[0] : NULL; }
+    T *end() { return buf ? &buf[ulen] : NULL; }
+    //NEW END
 
     T *getbuf() { return buf; }
     const T *getbuf() const { return buf; }
@@ -835,6 +897,20 @@ template<class T> struct hashset
     {
         HTFIND(key, c->elem, notfound);
     }
+
+    //NEW
+    template<class K>
+    bool exists(const K &key)
+    {
+        uint h = hthash(key)&(size-1);
+        for(chain *c = chains[h]; c; c = c->next)
+        {
+            if(htcmp(key, c->elem))
+                return true;
+        }
+        return false;
+    }
+    //NEW END
 
     template<class K>
     bool remove(const K &key)
@@ -1193,6 +1269,27 @@ static inline uchar cubeupper(uchar c)
 extern size_t decodeutf8(uchar *dst, size_t dstlen, const uchar *src, size_t srclen, size_t *carry = NULL);
 extern size_t encodeutf8(uchar *dstbuf, size_t dstlen, const uchar *srcbuf, size_t srclen, size_t *carry = NULL);
 
+//NEW
+#if !defined(PLUGIN) && !defined(STANDALONE)
+extern SDL_mutex *smutex;
+struct streamlocker
+{ 
+    streamlocker() { SDL_mutexP(smutex); }
+    ~streamlocker() { SDL_mutexV(smutex); }
+};
+extern void lockstream();
+extern void unlockstream();
+#else
+struct streamlocker
+{ 
+    streamlocker() { }
+    ~streamlocker() { }
+};
+static inline void lockstream() { }
+static inline void unlockstream() { }
+#endif //!PLUGIN && !STANDALONE
+//NEW END
+
 extern char *makerelpath(const char *dir, const char *file, const char *prefix = NULL, const char *cmd = NULL);
 extern char *path(char *s);
 extern char *path(const char *s, bool copy);
@@ -1201,6 +1298,7 @@ extern bool fileexists(const char *path, const char *mode);
 extern bool createdir(const char *path);
 extern size_t fixpackagedir(char *dir);
 extern const char *sethomedir(const char *dir);
+extern const char *gethomedir(); //NEW
 extern const char *addpackagedir(const char *dir);
 extern const char *findfile(const char *filename, const char *mode);
 extern bool findzipfile(const char *filename);
@@ -1217,6 +1315,8 @@ extern int listzipfiles(const char *dir, const char *ext, vector<char *> &files)
 extern void seedMT(uint seed);
 extern uint randomMT();
 
+namespace mod { class strtool; } //NEW
+
 extern void putint(ucharbuf &p, int n);
 extern void putint(packetbuf &p, int n);
 extern void putint(vector<uchar> &p, int n);
@@ -1232,9 +1332,21 @@ extern float getfloat(ucharbuf &p);
 extern void sendstring(const char *t, ucharbuf &p);
 extern void sendstring(const char *t, packetbuf &p);
 extern void sendstring(const char *t, vector<uchar> &p);
+//NEW
+extern void sendstring(const mod::strtool &text, ucharbuf &p);
+extern void sendstring(const mod::strtool &text, packetbuf &p);
+extern void sendstring(const mod::strtool &text, vector<uchar> &p);
+//NEW END
 extern void getstring(char *t, ucharbuf &p, size_t len);
+//NEW
+extern void getstring(mod::strtool &text, ucharbuf &p, size_t maxlen = -1, bool secret = false);
+//NEW END
 template<size_t N> static inline void getstring(char (&t)[N], ucharbuf &p) { getstring(t, p, N); }
 extern void filtertext(char *dst, const char *src, bool whitespace = true, bool forcespace = false, size_t len = sizeof(string)-1);
+//NEW
+extern void filtertext(mod::strtool &text, bool whitespace = true, bool secret = false);
+extern void getfilteredstring(mod::strtool &text, ucharbuf &p, bool whitespace = true, size_t maxlen = -1, bool secret = false);
+//NEW END
 
 struct ipmask
 {
@@ -1243,7 +1355,35 @@ struct ipmask
     void parse(const char *name);
     int print(char *buf) const;
     bool check(enet_uint32 host) const { return (host & mask) == ip; }
+
+    //NEW
+    bool ok() const { return mask > 0; }
+
+    enet_uint32 setbitcount(int bits)
+    {
+        if(bits==32) mask = 0xFFFFFFFF;
+        else mask = ENET_HOST_TO_NET_32(((1<<bits)-1)<<(32-bits));
+        return mask;
+    }
+
+    int getbitcount() const
+    {
+        uint tmp = mask-((mask>>1)&033333333333)-((mask>>2)&011111111111);
+        return ((tmp+(tmp>>3))&030707070707)%63;
+    }
+
+    enet_uint32 gethostcount() const
+    {
+        int bitcount = getbitcount();
+        if(bitcount>=30) return 1;
+        return pow(2, 32-bitcount)-2u;
+    }
+
+    ipmask(const char *name) : ip(0), mask(0) { parse(name); }
+    ipmask(enet_uint32 ip, enet_uint32 mask) : ip(ip), mask(mask) {}
+    ipmask() : ip(0), mask(0) {}
+    //NEW END
 };
-    
+
 #endif
 

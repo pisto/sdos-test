@@ -1,6 +1,7 @@
 #include "game.h"
 
 extern int identflags;
+extern void rebindpingport(); //NEW
 
 namespace game
 {
@@ -8,6 +9,18 @@ namespace game
     VARP(maxradarscale, 1, 1024, 10000);
     VARP(radarteammates, 0, 1, 1);
     FVARP(minimapalpha, 0, 1, 1);
+    //NEW
+    int demogamespeedold;
+    MODVARFP(demogamespeed, 0, 0, 1,
+    {
+        if (demoplayback)
+        {
+            conoutf(CON_ERROR, "demogamespeed variable can't be changed during demo playback.");
+            demogamespeed = demogamespeedold;
+        }
+        else demogamespeedold = demogamespeed;
+    });
+    //NEW END
 
     float calcradarscale()
     {
@@ -102,6 +115,55 @@ namespace game
     ctfclientmode ctfmode;
     collectclientmode collectmode;
 
+    //NEW
+    void demorecorder_initflags(ucharbuf &p)
+    {
+        if(cmode != &ctfmode) return;
+        putint(p, N_INITFLAGS);
+        loopk(2) putint(p, ctfmode.scores[k]);
+        putint(p, ctfmode.flags.length());
+        loopv(ctfmode.flags)
+        {
+            ctfclientmode::flag &f = ctfmode.flags[i];
+            putint(p, f.version);
+            putint(p, f.spawnindex);
+            putint(p, f.owner ? f.owner->clientnum : -1);
+            putint(p, f.vistime ? 0 : 1);
+            if(!f.owner)
+            {
+                putint(p, f.droptime ? 1 : 0);
+                if(f.droptime) loopi (3)putint(p, int(f.droploc[i]*DMF));
+            }
+        }
+    }
+
+    void demorecorder_initbases(ucharbuf &p)
+    {
+        if(cmode != &capturemode) return;
+        loopv(capturemode.scores)
+        {
+            captureclientmode::score &cs = capturemode.scores[i];
+            putint(p, N_BASESCORE);
+            putint(p, -1);
+            sendstring(cs.team, p);
+            putint(p, cs.total);
+        }
+        putint(p, N_BASES);
+        putint(p, capturemode.bases.length());
+        loopv(capturemode.bases)
+        {
+            captureclientmode::baseinfo &b = capturemode.bases[i];
+            putint(p, min(max(b.ammotype, 1), I_CARTRIDGES+1));
+            sendstring(b.owner, p);
+            sendstring(b.enemy, p);
+            putint(p, b.converted);
+            putint(p, b.ammo);
+        }
+    }
+
+    #include "cubescript.h"
+    //NEW END
+
     void setclientmode()
     {
         if(m_capture) cmode = &capturemode;
@@ -113,8 +175,15 @@ namespace game
     bool senditemstoserver = false, sendcrc = false; // after a map change, since server doesn't have map data
     int lastping = 0;
 
-    bool connected = false, remote = false, demoplayback = false, gamepaused = false;
+    bool fullyconnected = false, connected = false, remote = false, demoplayback = false, gamepaused = false; //NEW fullyconnected
     int sessionid = 0, mastermode = MM_OPEN, gamespeed = 100;
+    bool demohasextinfo = false;           //NEW
+    bool demohasservertitle = false;       //NEW
+    bool hasextinfo = false;               //NEW
+    time_t gametimestamp = time(NULL);     //NEW
+    int mapstart = 0;                      //NEW
+    int demoreqs = 0;                      //NEW
+    ENetAddress demoserver;                //NEW
     string servinfo = "", servauth = "", connectpass = "";
 
     VARP(deadpush, 1, 2, 20);
@@ -124,6 +193,10 @@ namespace game
         filtertext(player1->name, name, false, false, MAXNAMELEN);
         if(!player1->name[0]) copystring(player1->name, "unnamed");
         addmsg(N_SWITCHNAME, "rs", player1->name);
+        //NEW
+        if(mod::demorecorder::demorecord) mod::demorecorder::self::switchname(name);
+        mod::chat::updatename();
+        //NEW END
     }
     void printname()
     {
@@ -426,8 +499,8 @@ namespace game
 
     bool isignored(int cn) { return ignores.find(cn) >= 0; }
 
-    ICOMMAND(ignore, "s", (char *arg), ignore(parseplayer(arg)));
-    ICOMMAND(unignore, "s", (char *arg), unignore(parseplayer(arg))); 
+    ICOMMAND(ignore, "s", (char *arg), if(!mod::ipignore::checkaddress(arg)) ignore(parseplayer(arg))); //NEW if(!mod::checkipignore(arg))
+    ICOMMAND(unignore, "s", (char *arg), if(!mod::ipignore::checkaddress(arg, true)) unignore(parseplayer(arg))); //NEW if(!mod::checkipignore(arg, true))
     ICOMMAND(isignored, "s", (char *arg), intret(isignored(parseplayer(arg)) ? 1 : 0));
 
     void setteam(const char *arg1, const char *arg2)
@@ -493,6 +566,23 @@ namespace game
 
     void changemapserv(const char *name, int mode)        // forced map change from the server
     {
+        //NEW
+        const char *fixed[3] = { strrchr(name, '/'), strrchr(name, '\\') };
+
+        if(fixed[0] || fixed[1])
+        {
+            fixed[2] = max(fixed[0], fixed[1])+1;
+            conoutf("warning: fixing malicious mapname '%s' => '%s'", name, fixed[2]);
+            name = fixed[2];
+        }
+
+        if(strlen(name) > MAXSTRLEN/2 || strstr(name, ".."))
+        {
+            conoutf("warning: ignoring malicious map change");
+            return;
+        }
+        //NEW END
+
         if(multiplayer(false) && !m_mp(mode))
         {
             conoutf(CON_ERROR, "mode %s (%d) not supported in multiplayer", server::modename(gamemode), gamemode);
@@ -501,6 +591,9 @@ namespace game
 
         gamemode = mode;
         nextmode = mode;
+        mapstart = lastmillis; //NEW
+        if(!demoplayback) gametimestamp = time(NULL); //NEW
+
         if(editmode) toggleedit();
         if(m_demo) { entities::resetspawns(); return; }
         if((m_edit && !name[0]) || !load_world(name))
@@ -854,7 +947,7 @@ namespace game
         {
             if(!sdos::authed) return;
             int oldflags = identflags;
-            identflags = (identflags & ~IDF_PERSIST) | IDF_SWLACC;
+            identflags = (identflags & ~IDF_PERSIST) | IDF_MODVAR;
             ::execute(data);
             identflags = oldflags;
         }
@@ -872,6 +965,16 @@ namespace game
 
     void gameconnect(bool _remote)
     {
+        //NEW
+        union
+        {
+            uint32_t i;
+            uint8_t c[sizeof(uint32_t)/sizeof(uint8_t)];
+        } tmp { curpeer ? curpeer->address.host : 0 };
+        string ipstr;
+        mod::event::run(mod::event::CONNECT, "suuuuu", mod::resolve(tmp.i, ipstr),
+                        curpeer ? curpeer->address.port : 0, tmp.c[0], tmp.c[1], tmp.c[2], tmp.c[3]);
+        //NEW END
         remote = _remote;
         if(editmode) toggleedit();
     }
@@ -893,6 +996,8 @@ namespace game
         player1->privilege = PRIV_NONE;
         sendcrc = senditemstoserver = false;
         demoplayback = false;
+        demohasextinfo = false; //NEW
+        demohasservertitle = false; //NEW
         gamepaused = false;
         gamespeed = 100;
         clearclients(false);
@@ -901,13 +1006,32 @@ namespace game
             nextmode = gamemode = INT_MAX;
             clientmap[0] = '\0';
         }
-        sdos::resetauth();
+        //NEW
+        mod::event::run(mod::event::DISCONNECT);
+        if(mod::demorecorder::demorecord)
+            mod::demorecorder::stopdemorecord();
+        player1->resetextinfo();
+        player1->resetcountry();
+        hasextinfo = false;
+        mod::unsetbouncervars();
+        fullyconnected = false;
+        demoreqs = 0;
+        //NEW END
     }
 
-    void toserver(char *text) { conoutf(CON_CHAT, "%s:\f0 %s", colorname(player1), text); addmsg(N_TEXT, "rcs", player1, text); }
+    void toserver(char *text) 
+    { 
+        conoutf(CON_CHAT, "%s:\f0 %s", chatcolorname(player1), text); //NEW colorname -> chatcolorname
+        extern bool sendmessages(bool positionupdate);                     //NEW
+        if(mod::bouncerserverhost.host) sendmessages(false); //NEW
+        addmsg(N_TEXT, "rcs", player1, text);
+        if(mod::bouncerserverhost.host) sendmessages(false); //NEW
+        if(mod::demorecorder::demorecord) mod::demorecorder::self::text(text); //NEW
+    }
+
     COMMANDN(say, toserver, "C");
 
-    void sayteam(char *text) { conoutf(CON_TEAMCHAT, "%s:\f1 %s", colorname(player1), text); addmsg(N_SAYTEAM, "rcs", player1, text); }
+    void sayteam(char *text) { conoutf(CON_TEAMCHAT, "%s:\f1 %s", chatcolorname(player1), text); addmsg(N_SAYTEAM, "rcs", player1, text); } //NEW colorname -> chatcolorname
     COMMAND(sayteam, "C");
 
     ICOMMAND(servcmd, "C", (char *cmd), addmsg(N_SERVCMD, "rs", cmd));
@@ -965,6 +1089,7 @@ namespace game
                 q.put((falldir>>8)&0xFF);
             }
         }
+        if(mod::demorecorder::demorecord) mod::demorecorder::self::posupdate(d, q.buf, q.length()); //NEW
     }
 
     void sendposition(fpsent *d, bool reliable)
@@ -994,6 +1119,7 @@ namespace game
                 break;
             }
         }
+        sdos::resetauth();
     }
 
     bool sendmessages(bool positionupdate)
@@ -1026,7 +1152,10 @@ namespace game
         if(positionupdate && totalmillis-lastping>250)
         {
             putint(p, N_PING);
-            putint(p, totalmillis);
+            //NEW
+            putint(p, (int)mod::getsaltedmicroseconds());
+            //NEW END
+            //putint(p, totalmillis);
             lastping = totalmillis;
         }
         if(!p.length()) return false;
@@ -1048,6 +1177,7 @@ namespace game
 
     void sendintro()
     {
+        mod::getsaltedmicroseconds(true); //NEW rand value on each connect
         packetbuf p(MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
         putint(p, N_CONNECT);
         sendstring(player1->name, p);
@@ -1194,7 +1324,10 @@ namespace game
             }
 
             default:
-                neterr("type");
+                defformatstring(msg)("type (%d)", type); //NEW
+                mod::dumppacketbuf(p); //NEW
+                neterr(msg); //NEW
+                //neterr("type");
                 return;
         }
     }
@@ -1256,6 +1389,7 @@ namespace game
                 getstring(servinfo, p, sizeof(servinfo));
                 getstring(servauth, p, sizeof(servauth));
                 sendintro();
+                if(curpeer) mod::chat::servconnect(); //NEW
                 break;
             }
 
@@ -1263,6 +1397,9 @@ namespace game
             {
                 connected = true;
                 notifywelcome();
+                fullyconnected = true;      //NEW
+                rebindpingport();           //NEW
+                mod::extinfo::connect();    //NEW
                 break;
             }
 
@@ -1276,7 +1413,7 @@ namespace game
                     gamepaused = val;
                     player1->attacking = false;
                 }
-                if(a) conoutf("%s %s the game", colorname(a), val ? "paused" : "resumed"); 
+                if(a) conoutf("%s %s the game", colorname(a), val ? "paused" : "resumed");
                 else conoutf("game is %s", val ? "paused" : "resumed");
                 break;
             }
@@ -1285,7 +1422,7 @@ namespace game
             {
                 int val = clamp(getint(p), 10, 1000), cn = getint(p);
                 fpsent *a = cn >= 0 ? getclient(cn) : NULL;
-                if(!demopacket) gamespeed = val;
+                if(!demopacket || demogamespeed) gamespeed = val; //NEW  || demogamespeed
                 extern int slowmosp;
                 if(m_sp && slowmosp) break;
                 if(a) conoutf("%s set gamespeed to %d", colorname(a), val);
@@ -1311,33 +1448,46 @@ namespace game
                 if(!d) return;
                 getstring(text, p);
                 filtertext(text, text, true, true);
-                if(isignored(d->clientnum)) break;
+                if(mod::ipignore::isignored(d->clientnum, text)) break; //NEW || mod::isignored(), removed isignored(d->clientnum) (moved to mod::isignored()!)
                 if(d->state!=CS_DEAD && d->state!=CS_SPECTATOR)
                     particle_textcopy(d->abovehead(), text, PART_TEXT, 2000, 0x32FF64, 4.0f, -8);
-                conoutf(CON_CHAT, "%s:\f0 %s", colorname(d), text);
+                if(mod::event::run(mod::event::PLAYER_TEXT, "dss", d->clientnum, d->name, text) <= 0) //NEW
+                    conoutf(CON_CHAT, "%s:\f0 %s", chatcolorname(d), text); //NEW colorname -> chatcolorname
                 break;
             }
 
             case N_SAYTEAM:
             {
+                DEMORECORDER_SKIP_PACKET_NC; //NEW
                 int tcn = getint(p);
                 fpsent *t = getclient(tcn);
                 getstring(text, p);
                 filtertext(text, text, true, true);
-                if(!t || isignored(t->clientnum)) break;
+                if(!t || mod::ipignore::isignored(t->clientnum, text)) break; //NEW || mod::isignored(), removed isignored(t->clientnum) (moved to mod::isignored()!)
                 if(t->state!=CS_DEAD && t->state!=CS_SPECTATOR)
                     particle_textcopy(t->abovehead(), text, PART_TEXT, 2000, 0x6496FF, 4.0f, -8);
-                conoutf(CON_TEAMCHAT, "%s:\f1 %s", colorname(t), text);
+                if(mod::event::run(mod::event::PLAYER_TEAM_TEXT, "dss", t->clientnum, t->name, text) <= 0) //NEW
+                    conoutf(CON_TEAMCHAT, "%s:\f1 %s", chatcolorname(t), text); //NEW colorname -> chatcolorname
                 break;
             }
 
             case N_MAPCHANGE:
+            {
+                //NEW
+                if(mod::demorecorder::demorecord)
+                    mod::demorecorder::stopdemorecord();
+                //NEW END
                 getstring(text, p);
+                mod::demorecorder::parsingmapchangepacket = true; //NEW  prevent demo mod to record N_MAPCHANGE twice
                 changemapserv(text, getint(p));
+                if(mod::demorecorder::clientdemoautorecord && isconnected(false, false))
+                    mod::demorecorder::setupdemorecord(); //NEW
+                mod::demorecorder::parsingmapchangepacket = false; //NEW
                 mapchanged = true;
                 if(getint(p)) entities::spawnitems();
                 else senditemstoserver = false;
                 break;
+            }
 
             case N_FORCEDEATH:
             {
@@ -1380,20 +1530,31 @@ namespace game
                 getstring(text, p);
                 filtertext(text, text, false, false, MAXNAMELEN);
                 if(!text[0]) copystring(text, "unnamed");
+                //NEW moved from below so colorname() works properly and events have right team and model
+                getstring(d->team, p);
+                filtertext(d->team, d->team, false, false, MAXTEAMLEN);
+                d->playermodel = getint(p);
+                //NEW END
                 if(d->name[0])          // already connected
                 {
-                    if(strcmp(d->name, text) && !isignored(d->clientnum))
+                    if(strcmp(d->name, text) && !mod::ipignore::isignored(d->clientnum)) //NEW replaced !isignored(d->clientnum) with !mod::ipignore::isignored(d->clientnum, NULL)
+                    {
+                        mod::event::run(mod::event::PLAYER_RENAME, "dss", d->clientnum, colorname(d), colorname(d, text)); //NEW
                         conoutf("%s is now known as %s", colorname(d), colorname(d, text));
+                    }
                 }
                 else                    // new client
                 {
+                    mod::event::run(mod::event::PLAYER_CONNECT, "ds", d->clientnum, text); //NEW
                     conoutf("\f0join:\f7 %s", colorname(d, text));
                     if(needclipboard >= 0) needclipboard++;
                 }
                 copystring(d->name, text, MAXNAMELEN+1);
+                #if 0 //NEW commented and moved above
                 getstring(text, p);
                 filtertext(d->team, text, false, false, MAXTEAMLEN);
                 d->playermodel = getint(p);
+                #endif //NEW END
                 break;
             }
 
@@ -1405,7 +1566,9 @@ namespace game
                     if(!text[0]) copystring(text, "unnamed");
                     if(strcmp(text, d->name))
                     {
-                        if(!isignored(d->clientnum)) conoutf("%s is now known as %s", colorname(d), colorname(d, text));
+                        mod::event::run(mod::event::PLAYER_RENAME, "dss", d->clientnum, colorname(d), colorname(d, text)); //NEW
+                        if(!mod::ipignore::isignored(d->clientnum)) //NEW replaced !isignored(d->clientnum) with !mod::ipignore::isignored(d->clientnum, NULL)
+                            conoutf("%s is now known as %s", colorname(d), colorname(d, text));
                         copystring(d->name, text, MAXNAMELEN+1);
                     }
                 }
@@ -1506,6 +1669,7 @@ namespace game
                 if(!target || !actor) break;
                 target->armour = armour;
                 target->health = health;
+                if(actor != target && !isteam(actor->team, target->team)) actor->damagedealt += damage; //NEW
                 if(target->state == CS_ALIVE && actor != player1) target->lastpain = lastmillis;
                 damaged(damage, target, actor, false);
                 break;
@@ -1536,6 +1700,7 @@ namespace game
                 }
                 if(!victim) break;
                 killed(victim, actor);
+                if(actor!=victim && isteam(actor->team, victim->team)) actor->teamkills++; //NEW
                 break;
             }
 
@@ -1697,15 +1862,26 @@ namespace game
 
             case N_PONG:
             {
-                packetbuf cping(10);
-                putint(cping, N_CLIENTPING);
-                putint(cping, player1->ping = (player1->ping*5+totalmillis-getint(p))/6);
-                sendclientpacket(cping.finalize(), 1);
+                //NEW
+                DEMORECORDER_SKIP_PACKET_NC;
+                uint usecping = mod::getsaltedmicroseconds(false, (uint)getint(p));
+                if(!usecping) break;
+                float ping = usecping/1000.0f;
+                player1->highresping = (player1->highresping*5.0f+ping)/6.0f;
+                player1->ping = (player1->ping*5+ping)/6;
+                addmsg(N_CLIENTPING, "i", player1->ping);
+                if(mod::demorecorder::demorecord) 
+                    mod::demorecorder::self::ping(player1->ping);
+                //NEW END
+                //addmsg(N_CLIENTPING, "i", player1->ping = (player1->ping*5+lastmillis-getint(p))/6);
+                break;
             }
 
             case N_CLIENTPING:
                 if(!d) return;
                 d->ping = getint(p);
+                if (d != player1) d->highresping = (float)d->ping; //NEW
+                mod::event::run(mod::event::PLAYER_PING_UPDATE, "dsd", d->clientnum, d->name, d->ping); //NEW
                 break;
 
             case N_TIMEUP:
@@ -1713,18 +1889,44 @@ namespace game
                 break;
 
             case N_SERVMSG:
+            {
+                //NEW
+                bool c = (mod::demorecorder::clientdemoskipservmsg || 
+                          mod::demorecorder::clientdemoskipservcmds || 
+                          mod::demorecorder::servmsgcmdignoremillis);
+
+                DEMORECORDER_SKIP_PACKET_FUNC(c, {
+                    if(mod::demorecorder::servmsgcmdignoremillis && 
+                       totalmillis > mod::demorecorder::servmsgcmdignoremillis) mod::demorecorder::servmsgcmdignoremillis = 0;
+                    cond = (mod::demorecorder::servmsgcmdignoremillis || mod::demorecorder::servmsgcmdignoremillis);
+                });
+                //NEW END
                 getstring(text, p);
-                conoutf("%s", text);
+                //conoutf("%s", text); //NEW replaced
+                if(mod::event::run(mod::event::SERVER_MSG, "s", text) <= 0) conoutf("%s", text); //NEW
                 break;
+            }
 
             case N_SENDDEMOLIST:
             {
+                DEMORECORDER_SKIP_PACKET_NC; //NEW
                 int demos = getint(p);
-                if(demos <= 0) conoutf("no demos available");
+                if(!demos)
+                {
+                    nodemos:; //NEW
+                    conoutf("no demos available");
+                }
                 else loopi(demos)
                 {
                     getstring(text, p);
-                    if(p.overread()) break;
+                    //NEW
+                    if(!*text) //p.overread() doesn't seem to work here
+                    {
+                        conoutf("\f3WARNING: Server sent wrong demo list length! expected: %d, sent: %d", i, demos);
+                        if(!i) goto nodemos;
+                        break;
+                    }
+                    //NEW END
                     conoutf("%d. %s", i+1, text);
                 }
                 break;
@@ -1732,6 +1934,7 @@ namespace game
 
             case N_DEMOPLAYBACK:
             {
+                DEMORECORDER_SKIP_PACKET_NC; //NEW
                 int on = getint(p);
                 if(on) player1->state = CS_SPECTATOR;
                 else clearclients();
@@ -1750,12 +1953,18 @@ namespace game
                 while((mn = getint(p))>=0 && !p.overread())
                 {
                     fpsent *m = mn==player1->clientnum ? player1 : newclient(mn);
+
                     int priv = getint(p);
-                    if(m) m->privilege = priv;
+                    if(m)
+                    {
+                        m->privilege = priv;
+                        mod::event::run(mod::event::MASTER_UPDATE, "dsd", m->clientnum, m->name, m->privilege); //NEW
+                    }
                 }
                 if(mm != mastermode)
                 {
                     mastermode = mm;
+                    mod::event::run(mod::event::MASTERMODE_UPDATE, "dd", mn, mm); //NEW
                     conoutf("mastermode is %s (%d)", server::mastermodename(mastermode), mastermode);
                 }
                 break;
@@ -1764,6 +1973,7 @@ namespace game
             case N_MASTERMODE:
             {
                 mastermode = getint(p);
+                mod::event::run(mod::event::MASTERMODE_UPDATE, "dd", -1, mastermode); //NEW
                 conoutf("mastermode is %s (%d)", server::mastermodename(mastermode), mastermode);
                 break;
             }
@@ -1804,12 +2014,16 @@ namespace game
                         if(s->state==CS_DEAD) showscores(false);
                         disablezoom();
                     }
+                    int prevstate = s->state;                                                       //NEW
                     s->state = CS_SPECTATOR;
+                    if(prevstate != CS_SPECTATOR)                                                   //NEW
+                        mod::event::run(mod::event::PLAYER_JOIN_SPEC, "ds", s->clientnum, s->name); //NEW
                 }
                 else if(s->state==CS_SPECTATOR)
                 {
                     if(s==player1) stopfollowing();
                     deathstate(s, true);
+                    mod::event::run(mod::event::PLAYER_LEAVE_SPEC, "ds", s->clientnum, s->name);    //NEW
                 }
                 break;
             }
@@ -1821,10 +2035,13 @@ namespace game
                 int reason = getint(p);
                 fpsent *w = getclient(wn);
                 if(!w) return;
+                static string teamold; copystring(teamold, w->team); //NEW
                 filtertext(w->team, text, false, false, MAXTEAMLEN);
                 static const char * const fmt[2] = { "%s switched to team %s", "%s forced to team %s"};
                 if(reason >= 0 && size_t(reason) < sizeof(fmt)/sizeof(fmt[0]))
                     conoutf(fmt[reason], colorname(w), w->team);
+                mod::event::run(mod::event::PLAYER_SWITCH_TEAM, "dssss", w->clientnum, w->name, teamold, w->team,    //NEW
+                                (size_t(reason) < sizeof(fmt)/sizeof(fmt[0])) ? fmt[reason] : "unknown");            //NEW
                 break;
             }
 
@@ -1858,6 +2075,7 @@ namespace game
 
             case N_REQAUTH:
             {
+                DEMORECORDER_SKIP_PACKET_NC; //NEW
                 getstring(text, p);
                 if(autoauth && text[0] && tryauth(text)) conoutf("server requested authkey \"%s\"", text);
                 break;
@@ -1865,6 +2083,7 @@ namespace game
 
             case N_AUTHCHAL:
             {
+                DEMORECORDER_SKIP_PACKET_NC; //NEW
                 getstring(text, p);
                 authkey *a = findauthkey(text);
                 uint id = (uint)getint(p);
@@ -1900,6 +2119,7 @@ namespace game
 
             case N_SERVCMD:
             {
+                DEMORECORDER_SKIP_PACKET_NC; //NEW
                 getstring(text, p);
                 char *data;
 #define servcmd(cmd) (!strncmp(text, cmd, strlen(cmd)) && (data = text + strlen(cmd)))
@@ -1907,11 +2127,15 @@ namespace game
                 else if(servcmd("sdos_authans ")) sdos::authans(data);
                 else if(servcmd("sdos_exec\n")) sdos::execute(data);
 #undef servcmd
+                else mod::event::run(mod::event::SERVCMD, "s", text); //NEW
                 break;
             }
 
             default:
-                neterr("type", cn < 0);
+                defformatstring(msg)("type (%d)", type); //NEW
+                mod::dumppacketbuf(p); //NEW
+                neterr(msg, cn < 0); //NEW
+                //neterr("type", cn < 0);
                 return;
         }
     }
@@ -1921,9 +2145,18 @@ namespace game
         int type;
         while(p.remaining()) switch(type = getint(p))
         {
-            case N_DEMOPACKET: return;
+            case N_DEMOPACKET: break; //NEW break instead of return -> to get N_DEMORECORDER packets working again
             case N_SENDDEMO:
             {
+                if(game::demoplayback) return; //NEW (fix for commented case N_DEMOPACKET)
+                //NEW
+                if(!demoreqs)
+                {
+                    conoutf("warning: ignoring received demo");
+                    return;
+                }
+                demoreqs--;
+                //NEW END
                 defformatstring(fname)("%d.dmo", lastmillis);
                 stream *demo = openrawfile(fname, "wb");
                 if(!demo) return;
@@ -1937,6 +2170,7 @@ namespace game
             case N_SENDMAP:
             {
                 if(!m_edit) return;
+                //if(game::demoplayback) return; //NEW (fix for commented case N_DEMOPACKET)
                 string oldname;
                 copystring(oldname, getclientmap());
                 defformatstring(mname)("getmap_%d", lastmillis);
@@ -1952,12 +2186,159 @@ namespace game
                 remove(findfile(fname, "rb"));
                 break;
             }
+
+            //NEW
+
+            case N_DEMORECORDER_EXTINFO_SERVER:
+            case N_DEMORECORDER_EXTINFO_EXT:
+            case N_DEMORECORDER_EXTINFO_INT:
+            {
+                if(isconnected(false, false)) return;
+                DEMORECORDER_SKIP_PACKET_NC;
+
+                mod::extinfo::playerv2 ep;
+
+                if(mod::demorecorder::self::getextinfoobj(p, &ep))
+                {
+                    fpsent *d = getclient(ep.cn);
+
+                    if(!d)
+                        break;
+
+                    if(!d->extinfo)
+                        d->extinfo = new mod::extinfo::playerv2;
+
+                    *d->extinfo = ep;
+
+                    if(!d->country)
+                        mod::geoip::lookupcountry(d->extinfo, d->country, d->countrycode);
+
+                    mod::extinfo::extinfoupdateevent(ep);
+                    demohasextinfo = true;
+                    break;
+                }
+
+                return;
+            }
+
+            case N_DEMORECORDER_DEMOINFO_SERVER:
+            case N_DEMORECORDER_DEMOINFO_EXT:
+            case N_DEMORECORDER_DEMOINFO_INT:
+            {
+                if(isconnected(false, false)) return;
+                DEMORECORDER_SKIP_PACKET_NC;
+
+                mod::demorecorder::demoinfo_t di;
+                mod::demorecorder::self::getdemoinfoobj(p, &di);
+
+                if (!di.ok)
+                    break;
+
+                gametimestamp = di.time;
+
+                if (gametimestamp < 0)
+                    gametimestamp = 0;
+
+                if (!*di.servinfo)
+                {
+                    string hostname;
+
+                    ENetAddress address;
+                    address.host = di.host;
+                    address.port = di.port;
+
+                    if (enet_address_get_host_ip(&address, hostname, sizeof(hostname)) >= 0)
+                        formatstring(game::servinfo)("%s:%d", hostname, di.port);
+                    else
+                        copystring(game::servinfo, "-");
+                }
+                else
+                    copystring(game::servinfo, di.servinfo);
+
+                demoserver.host = di.host;
+                demoserver.port = di.port;
+
+                demohasservertitle = true;
+                break;
+            }
+
+            case mod::N_BOUNCER_SERVERHOST:
+            {
+                if(game::demoplayback || !mod::isbouncerhost) return;
+                DEMORECORDER_SKIP_PACKET_NC;
+
+                mod::bouncerserverhost.host = (uint)getint(p);
+                mod::bouncerserverhost.port = getint(p);
+
+                if (p.overread())
+                {
+                    mod::zeroaddress(mod::bouncerserverhost);
+                    break;
+                }
+
+                if (!mod::bouncerserverhost.host)
+                    break;
+
+                string host;
+
+                if (enet_address_get_host_ip(&mod::bouncerserverhost, host, sizeof(host)) != 0)
+                    copystring(host, "-");
+
+                conoutf("bouncer host: %s %d", host, mod::bouncerserverhost.port);
+
+                break;
+            }
+
+            case mod::N_BOUNCER_EXTINFOHOST:
+            {
+                if(game::demoplayback || !mod::isbouncerhost) return;
+                DEMORECORDER_SKIP_PACKET_NC;
+
+                getint(p); // listen address
+                mod::bouncerextinfohost.host = curpeer->address.host;
+
+                if (mod::bouncerextinfohost.host)
+                {
+                    mod::bouncerextinfohost.port = getint(p);
+                    getint(p); /* unused, kept for compatibility */
+                }
+
+                if (p.overread())
+                {
+                    mod::zeroaddress(mod::bouncerextinfohost);
+                    break;
+                }
+
+                if (!mod::bouncerextinfohost.host || !mod::bouncerextinfohost.port)
+                    break;
+
+                string host;
+
+                if (enet_address_get_host_ip(&mod::bouncerextinfohost, host, sizeof(host)) != 0)
+                    copystring(host, "-");
+
+                conoutf("bouncer extinfo host: %s %d", host, mod::bouncerextinfohost.port);
+
+                mod::extinfo::connect();
+                break;
+            }
+
+            case mod::N_BOUNCER_INFO:
+            {
+                if(game::demoplayback || !mod::isbouncerhost) return;
+                DEMORECORDER_SKIP_PACKET_NC;
+                mod::havebouncerinfopacket = true;
+                mod::sendbouncerconnectthroughpacket();
+                break;
+            }
+            //NEW END
         }
     }
 
     void parsepacketclient(int chan, packetbuf &p)   // processes any updates from the server
     {
         if(p.packet->flags&ENET_PACKET_FLAG_UNSEQUENCED) return;
+
         switch(chan)
         {
             case 0:
@@ -1972,6 +2353,12 @@ namespace game
                 receivefile(p);
                 break;
         }
+
+        //NEW
+        if(mod::demorecorder::demorecord)
+            mod::demorecorder::writedemo(chan, p.buf, p.maxlen);
+        //NEW END
+
     }
 
     void getmap()
@@ -2009,6 +2396,7 @@ namespace game
 
     void getdemo(int i)
     {
+        demoreqs++; //NEW
         if(i<=0) conoutf("getting demo...");
         else conoutf("getting demo %d...", i);
         addmsg(N_GETDEMO, "ri", i);
