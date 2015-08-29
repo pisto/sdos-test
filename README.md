@@ -60,48 +60,6 @@ testing. Reports of oddities or bad functioning are important, but
   between the time you type text/hit/do any game action and when the
   packet itself is sent to the server. This has been fixed.
 
-## Bonus pro setting : low latency, just-in-time VSYNC. ##
-
-  Usually top players set `/vsync 0` and a suitable value of `/maxfps`
-  to minimize input lag. This is because the standard Sauerbraten engine
-  draws one frame for each engine update. This means that with `/vsync 1`,
-  or a low framerate, the input lag gets to be substantial.
-
-  I try to fix this problem by decoupling the engine refresh cycles from
-  drawing, and running the two things in different threads: this means that
-  while a frame is being drawn, the engine can keep running and poll input,
-  work on network packets, etc. It is then possible to use `/vsync 1` to
-  remove tearing, and still have acceptable input lag.
-
-  This can be further improved by moving the start of the frame drawing, and
-  so the game state read, as close as possible to the vsync, that is the start
-  of the screen refresh. For a more in-depth discussion, please read
-  [this nice explanation](http://www.quakeworld.nu/forum/topic/2444/vsync-lag-solution).
-  The implementation I have now is referred in the topic as *just-in-time VSYNC ON*.
-  Simply put, the drawer thread wakes up just in time to draw a frame (plus
-  a safety margin to allow jitter in the frame draw time), and finish
-  very close to vsync. The time lag between the start of the frame draw
-  and the vsync should equal the real input lag, and this process should
-  minimize it.
-
-  To enable this experimental very-low-latency code, just use `/vsync 2`.
-  There is just another parameter: `/jitvanticipate <value>`: it controls
-  the safety marging of early wakeup of the drawer thread. A lower value
-  minimizes input lag, but can cause a higher vsync miss.
-
-  `/showfps 1` helps you in evaluating and tuning the just-in-time
-  performance:
-
-- fps: number of frames drawn (should equal the monitor refresh rate)
-- lag x(y): x is the total input lag, y is the time wasted in waiting
-  for vsync
-- miss x(y): x is the number of vsync misses per second, y is the number
-  of the resets of the timing engine (happens with a way too low value
-  of `/jitvanticipate`, and cause microstutters)
-
-  On my crappy hardware, I can get a stable input lag down to 3-4 ms
-  with a 60 Hz LCD, which is much better than the frame display time (~16 ms).
-
 # Giving Feedback #
 
 Send feedback
