@@ -44,8 +44,11 @@ libSDL_mixer:
 libgeoip:
 	cd libgeoip; ./configure --host=$(PREFIX) --prefix="$(ROOT)" --enable-shared=no
 
+libressl:
+	cd libressl; ./configure --host=$(PREFIX) --prefix="$(ROOT)" --enable-shared=no
+
 env:
 	env
 
-.PHONY : libz libenet libjpeg libpng libvorbis libogg libSDL libSDL_image libSDL_mixer libgeoip env
+.PHONY : libz libenet libjpeg libpng libvorbis libogg libSDL libSDL_image libSDL_mixer libgeoip libressl env
 
