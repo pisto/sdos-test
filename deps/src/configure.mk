@@ -47,8 +47,11 @@ libgeoip:
 libressl:
 	cd libressl; ./configure --host=$(PREFIX) --prefix="$(ROOT)" --enable-shared=no
 
+libcurl:
+	cd libcurl; ./configure --host=$(PREFIX) --prefix="$(ROOT)" --enable-shared=no --enable-threaded-resolver --disable-ldap --disable-ldaps --disable-rtsp --with-ssl --without-libssh2 --without-libidn --without-librtmp
+
 env:
 	env
 
-.PHONY : libz libenet libjpeg libpng libvorbis libogg libSDL libSDL_image libSDL_mixer libgeoip libressl env
+.PHONY : libz libenet libjpeg libpng libvorbis libogg libSDL libSDL_image libSDL_mixer libgeoip libressl libcurl env
 
