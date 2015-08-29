@@ -42,7 +42,7 @@ libSDL_mixer:
 	cd libSDL_mixer; ./configure --host=$(PREFIX) --prefix="$(ROOT)" --enable-shared=no --disable-sdltest --enable-music-cmd=no --enable-music-mod=no --enable-music-mod-modplug=no --enable-music-mod-mikmod=no --enable-music-midi=no --enable-music-midi-timidity=no --enable-music-midi-native=no --enable-music-midi-fluidsynth=no --enable-music-flac=no --enable-music-ogg-shared=no --enable-music-mp3=no --enable-music-mp3-smpeg=no --enable-music-mp3-mad-gpl=no --disable-smpegtest 
 
 libgeoip:
-	cd libgeoip; ./configure --host=$(PREFIX) --prefix="$(ROOT)" --enable-shared=no
+	cd libgeoip; ac_cv_func_malloc_0_nonnull=yes ac_cv_func_realloc_0_nonnull=yes ./configure --host=$(PREFIX) --prefix="$(ROOT)" --enable-shared=no
 
 libressl:
 	cd libressl; ./configure --host=$(PREFIX) --prefix="$(ROOT)" --enable-shared=no
