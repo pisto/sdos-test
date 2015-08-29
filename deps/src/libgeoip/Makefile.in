@@ -352,7 +352,11 @@ top_srcdir = @top_srcdir@
 AM_CPPFLAGS = -Wall -ansi
 ACLOCAL_AMFLAGS = -I m4
 AUTOMAKE_OPTIONS = foreign
-SUBDIRS = libGeoIP
+SUBDIRS = \
+	libGeoIP	\
+	apps		\
+	test		\
+	man
 
 pkgconfigdir = $(libdir)/pkgconfig/
 nodist_pkgconfig_DATA = geoip.pc
