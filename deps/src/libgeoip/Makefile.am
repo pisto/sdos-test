@@ -3,11 +3,7 @@ ACLOCAL_AMFLAGS = -I m4
 
 AUTOMAKE_OPTIONS = foreign
 
-SUBDIRS =		\
-	libGeoIP	\
-	apps		\
-	test		\
-	man
+SUBDIRS = libGeoIP
 
 pkgconfigdir = $(libdir)/pkgconfig/
 nodist_pkgconfig_DATA = geoip.pc
