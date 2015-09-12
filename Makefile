@@ -71,7 +71,7 @@ MACOBJCXX:= xcode/macutils.o
 
 ifdef WINDOWS
 override LDFLAGS+= -mwindows
-override LIBS+= -lenet -lSDL2 -lSDL2_image -ljpeg -lpng -lz -lSDL2_mixer -logg -lvorbis -lvorbisfile -lws2_32 -lwinmm -lopengl32 -ldxguid -lgdi32 -lole32 -limm32 -lversion -loleaut32 -Wl,-Bstatic -static-libgcc -static-libstdc++ -Wl,-Bstatic -lpthread
+override LIBS+= -lenet -lSDL2 -lSDL2_image -ljpeg -lpng -lz -lSDL2_mixer -logg -lvorbis -lvorbisfile -lws2_32 -lwinmm -lopengl32 -ldxguid -lgdi32 -lole32 -limm32 -lversion -loleaut32 -static-libgcc -static-libstdc++
 endif
 
 ifdef LINUX
@@ -102,7 +102,7 @@ clean:
 ifdef WINDOWS
 client: $(CLIENT_OBJS)
 	$(WINDRES) -I vcpp -i vcpp/mingw.rc -J rc -o vcpp/mingw.res -O coff 
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o sauerbraten.exe vcpp/mingw.res $(CLIENT_OBJS) -Wl,--as-needed -Wl,--start-group $(LIBS) -Wl,--end-group
+	$(CXX) -static $(CXXFLAGS) $(LDFLAGS) -o sauerbraten.exe vcpp/mingw.res $(CLIENT_OBJS) -Wl,--as-needed -Wl,--start-group $(LIBS) -Wl,--end-group
 	$(STRIP) sauerbraten.exe
 	-$(UPX) sauerbraten.exe
 endif
