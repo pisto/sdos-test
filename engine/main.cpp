@@ -902,6 +902,7 @@ void checkinput()
                             scr_w = clamp(screenw, SCR_MINW, SCR_MAXW);
                             scr_h = clamp(screenh, SCR_MINH, SCR_MAXH);
                         }
+                        gl_resize();
                     }
                         break;
                 }
