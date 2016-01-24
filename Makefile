@@ -1,82 +1,15 @@
-CXXFLAGS= -O3 -fomit-frame-pointer -ffast-math
-override CXXFLAGS+= -Wall -fsigned-char -fno-exceptions -fno-rtti
+include deps/platform.mk
 
-PLATFORM= $(shell uname -s | tr '[:lower:]' '[:upper:]')
-PLATFORM_PREFIX= native
-
-INCLUDES= -Ishared -Iengine -Ifpsgame -Ienet/include
-
-STRIP=
-ifeq (,$(findstring -g,$(CXXFLAGS)))
-ifeq (,$(findstring -pg,$(CXXFLAGS)))
-  STRIP=strip
-endif
-endif
-
-MV=mv
-
-ifneq (,$(findstring MINGW,$(PLATFORM)))
-WINDRES= windres
-ifneq (,$(findstring 64,$(PLATFORM)))
-ifneq (,$(findstring CROSS,$(PLATFORM)))
-  CXX=x86_64-w64-mingw32-g++
-  WINDRES=x86_64-w64-mingw32-windres
-ifneq (,$(STRIP))
-  STRIP=x86_64-w64-mingw32-strip
-endif
-endif
-WINLIB=lib64
-WINBIN=../bin64
-override CXX+= -m64
-override WINDRES+= -F pe-x86-64
+override CFLAGS+= -Ideps/$(DEPSNAME)/include/SDL2 -Ishared -Iengine -Ifpsgame -Wall -fsigned-char
+override CXXFLAGS+= -Ideps/$(DEPSNAME)/include/SDL2 -Ishared -Iengine -Ifpsgame -std=gnu++14 -Wall -fsigned-char -fno-exceptions -fno-rtti
+ifneq (,$(findstring -ggdb,$(CXXFLAGS)))
+  STRIP=true
+  UPX=true
 else
-ifneq (,$(findstring CROSS,$(PLATFORM)))
-  CXX=i686-w64-mingw32-g++
-  WINDRES=i686-w64-mingw32-windres
-ifneq (,$(STRIP))
-  STRIP=i686-w64-mingw32-strip
+  UPX=upx
 endif
-endif
-WINLIB=lib
-WINBIN=../bin
-override CXX+= -m32
-override WINDRES+= -F pe-i386
-endif
-CLIENT_INCLUDES= $(INCLUDES) -Iinclude
-STD_LIBS= -static-libgcc -static-libstdc++
-CLIENT_LIBS= -mwindows $(STD_LIBS) -L$(WINBIN) -L$(WINLIB) -lSDL2 -lSDL2_image -lSDL2_mixer -lzlib1 -lopengl32 -lenet -lws2_32 -lwinmm
-else	
-ifneq (,$(findstring DARWIN,$(PLATFORM)))
-ifneq (,$(findstring CROSS,$(PLATFORM)))
-  TOOLCHAINTARGET= $(shell osxcross-conf | grep -m1 "TARGET=" | cut -b24-)
-  TOOLCHAIN= x86_64-apple-$(TOOLCHAINTARGET)-
-  AR= $(TOOLCHAIN)ar
-  CXX= $(TOOLCHAIN)clang++
-  CC= $(TOOLCHAIN)clang
-ifneq (,$(STRIP))
-  STRIP= $(TOOLCHAIN)strip
-endif
-endif
-OSXMIN= 10.6
-override CC+= -arch x86_64 -mmacosx-version-min=$(OSXMIN)
-override CXX+= -arch x86_64 -mmacosx-version-min=$(OSXMIN)
-CLIENT_INCLUDES= $(INCLUDES) -Iinclude
-CLIENT_LIBS= -Fxcode/Frameworks -framework SDL2 -framework SDL2_image
-CLIENT_LIBS+= -framework SDL2_mixer -framework CoreAudio -framework AudioToolbox
-CLIENT_LIBS+= -framework AudioUnit -framework OpenGL -framework Cocoa -lz -Lenet -lenet
-else
-CLIENT_INCLUDES= $(INCLUDES) -I/usr/X11R6/include `sdl2-config --cflags`
-CLIENT_LIBS= -Lenet -lenet -L/usr/X11R6/lib -lX11 `sdl2-config --libs` -lSDL2_image -lSDL2_mixer -lz -lGL
-endif
-endif
-ifeq ($(PLATFORM),LINUX)
-CLIENT_LIBS+= -lrt
-else
-ifneq (,$(findstring GNU,$(PLATFORM)))
-CLIENT_LIBS+= -lrt 
-endif         
-endif
-CLIENT_OBJS= \
+
+CLIENT_OBJS:= \
 	shared/crypto.o \
 	shared/geom.o \
 	shared/glemu.o \
@@ -133,115 +66,54 @@ CLIENT_OBJS= \
 	fpsgame/waypoint.o \
 	fpsgame/weapon.o
 
-CLIENT_PCH= shared/cube.h.gch engine/engine.h.gch fpsgame/game.h.gch
-
-ifneq (,$(findstring MINGW,$(PLATFORM)))
-SERVER_INCLUDES= -DSTANDALONE $(INCLUDES) -Iinclude
-SERVER_LIBS= -mwindows $(STD_LIBS) -L$(WINBIN) -L$(WINLIB) -lzlib1 -lenet -lws2_32 -lwinmm
-MASTER_LIBS= $(STD_LIBS) -L$(WINBIN) -L$(WINLIB) -lzlib1 -lenet -lws2_32 -lwinmm
-else
-SERVER_INCLUDES= -DSTANDALONE $(INCLUDES)
-SERVER_LIBS= -Lenet -lenet -lz
-MASTER_LIBS= $(SERVER_LIBS)
-endif
-SERVER_OBJS= \
-	shared/crypto-standalone.o \
-	shared/stream-standalone.o \
-	shared/tools-standalone.o \
-	engine/command-standalone.o \
-	engine/server-standalone.o \
-	engine/worldio-standalone.o \
-	fpsgame/entities-standalone.o \
-	fpsgame/server-standalone.o
-
-MASTER_OBJS= \
-	shared/crypto-standalone.o \
-	shared/stream-standalone.o \
-	shared/tools-standalone.o \
-	engine/command-standalone.o \
-	engine/master-standalone.o
-
-SERVER_MASTER_OBJS= $(SERVER_OBJS) $(filter-out $(SERVER_OBJS),$(MASTER_OBJS))
-
-ifneq (,$(findstring DARWIN,$(PLATFORM)))
-CLIENT_OBJS+= xcode/macutils.o xcode/main.o xcode/Launcher.o
-
-%.o: %.mm
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-%.o: %.m
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+ifdef WINDOWS
+override LDFLAGS+= -mwindows
+override LIBS+= -lenet -lSDL2 -lSDL2_image -ljpeg -lpng -lz -lSDL2_mixer -logg -lvorbis -lvorbisfile -lws2_32 -lwinmm -lopengl32 -ldxguid -lgdi32 -lole32 -limm32 -lversion -loleaut32 -static-libgcc -static-libstdc++
 endif
 
-default: all
+ifdef LINUX
+override LIBS+= -lGL -lenet -lSDL2 -lSDL2_image -ljpeg -lpng -lz -lSDL2_mixer -logg -lvorbis -lvorbisfile -lm -ldl
+endif
 
-all: client server
+ifdef MAC
+override LIBS+= -lenet -lSDL2 -lSDL2_image -ljpeg -lpng -lz -lSDL2_mixer -logg -lvorbis -lvorbisfile -framework IOKit -framework Cocoa -framework CoreVideo -framework Carbon -framework CoreAudio -framework OpenGL -framework AudioUnit -lm -ldl
+endif
 
-clean:
-	-$(RM) $(CLIENT_PCH) $(CLIENT_OBJS) $(SERVER_MASTER_OBJS) sauer_client sauer_server sauer_master
 
-$(filter-out shared/%,$(CLIENT_PCH)): $(filter shared/%,$(CLIENT_PCH))
 
-%.h.gch: %.h
-	$(CXX) $(CXXFLAGS) -x c++-header -o $@.tmp $<
-	$(MV) $@.tmp $@
-
-%-standalone.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-$(CLIENT_OBJS): CXXFLAGS += $(CLIENT_INCLUDES)
-$(filter shared/%,$(CLIENT_OBJS)): $(filter shared/%,$(CLIENT_PCH))
-$(filter engine/%,$(CLIENT_OBJS)): $(filter engine/%,$(CLIENT_PCH))
-$(filter fpsgame/%,$(CLIENT_OBJS)): $(filter fpsgame/%,$(CLIENT_PCH))
-
-$(SERVER_MASTER_OBJS): CXXFLAGS += $(SERVER_INCLUDES)
-
-ifneq (,$(findstring MINGW,$(PLATFORM)))
+ifdef WINDOWS
 client: $(CLIENT_OBJS)
 	$(WINDRES) -I vcpp -i vcpp/mingw.rc -J rc -o vcpp/mingw.res -O coff 
-	$(CXX) $(CXXFLAGS) -o $(WINBIN)/sauerbraten.exe vcpp/mingw.res $(CLIENT_OBJS) $(CLIENT_LIBS)
+	$(CXX) -static $(CXXFLAGS) $(LDFLAGS) -o sauerbraten.exe vcpp/mingw.res $(CLIENT_OBJS) -Wl,--as-needed -Wl,--start-group $(LIBS) -Wl,--end-group
+	$(STRIP) sauerbraten.exe
+	-$(UPX) sauerbraten.exe
+endif
 
-server: $(SERVER_OBJS)
-	$(WINDRES) -I vcpp -i vcpp/mingw.rc -J rc -o vcpp/mingw.res -O coff
-	$(CXX) $(CXXFLAGS) -o $(WINBIN)/sauer_server.exe vcpp/mingw.res $(SERVER_OBJS) $(SERVER_LIBS)
+ifdef MAC
 
-master: $(MASTER_OBJS)
-	$(CXX) $(CXXFLAGS) -o $(WINBIN)/sauer_master.exe $(MASTER_OBJS) $(MASTER_LIBS)
+client:	$(CLIENT_OBJS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o sauerbraten $(CLIENT_OBJS) $(LIBS)
+	$(STRIP) sauerbraten
+	-$(UPX) sauerbraten
+endif
 
-install: all
-else
-client:	libenet $(CLIENT_OBJS)
-	$(CXX) $(CXXFLAGS) -o sauer_client $(CLIENT_OBJS) $(CLIENT_LIBS)
-
-server:	libenet $(SERVER_OBJS)
-	$(CXX) $(CXXFLAGS) -o sauer_server $(SERVER_OBJS) $(SERVER_LIBS)  
-	
-master: libenet $(MASTER_OBJS)
-	$(CXX) $(CXXFLAGS) -o sauer_master $(MASTER_OBJS) $(MASTER_LIBS)  
-
-shared/cube2font.o: shared/cube2font.c
-	$(CXX) $(CXXFLAGS) -c -o $@ $< `freetype-config --cflags`
-
-cube2font: shared/cube2font.o
-	$(CXX) $(CXXFLAGS) -o cube2font shared/cube2font.o `freetype-config --libs` -lz
-
-install: all
-	cp sauer_client	../bin_unix/$(PLATFORM_PREFIX)_client
-	cp sauer_server	../bin_unix/$(PLATFORM_PREFIX)_server
-ifneq (,$(STRIP))
-	$(STRIP) ../bin_unix/$(PLATFORM_PREFIX)_client
-	$(STRIP) ../bin_unix/$(PLATFORM_PREFIX)_server
+ifdef LINUX
+client:	$(CLIENT_OBJS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o sauer_client $(CLIENT_OBJS) -Wl,--as-needed -Wl,--start-group $(LIBS) -lrt -Wl,--end-group
+	$(STRIP) sauer_client
+ifneq ($(STRIP),true)
+	-$(UPX) sauer_client
 endif
 endif
 
-enet/libenet.a:
-	$(MAKE) -C enet CC='$(CC)' AR='$(AR)'
-libenet: enet/libenet.a
+clean:
+	-$(RM) -r $(CLIENT_OBJS) data.zip sauer_client sauerbraten sauerbraten.exe vcpp/mingw.res
 
-depend:
-	makedepend -Y -Ishared -Iengine -Ifpsgame $(CLIENT_OBJS:.o=.cpp)
-	makedepend -a -o.h.gch -Y -Ishared -Iengine -Ifpsgame $(CLIENT_PCH:.h.gch=.h)
-	makedepend -a -o-standalone.o -Y -DSTANDALONE -Ishared -Iengine -Ifpsgame $(SERVER_MASTER_OBJS:-standalone.o=.cpp)
+makedepend:
+	makedepend -a -Y -Ishared -Iengine -Ifpsgame $(CLIENT_OBJS:.o=.cpp)
+
+.DEFAULT_GOAL := client
+.PHONY := makedepend clean
 
 # DO NOT DELETE
 
@@ -502,46 +374,3 @@ fpsgame/waypoint.o: fpsgame/ai.h
 fpsgame/weapon.o: fpsgame/game.h shared/cube.h shared/tools.h shared/geom.h
 fpsgame/weapon.o: shared/ents.h shared/command.h shared/glexts.h
 fpsgame/weapon.o: shared/glemu.h shared/iengine.h shared/igame.h fpsgame/ai.h
-
-shared/cube.h.gch: shared/tools.h shared/geom.h shared/ents.h
-shared/cube.h.gch: shared/command.h shared/glexts.h shared/glemu.h
-shared/cube.h.gch: shared/iengine.h shared/igame.h
-engine/engine.h.gch: shared/cube.h shared/tools.h shared/geom.h shared/ents.h
-engine/engine.h.gch: shared/command.h shared/glexts.h shared/glemu.h
-engine/engine.h.gch: shared/iengine.h shared/igame.h engine/world.h
-engine/engine.h.gch: engine/octa.h engine/lightmap.h engine/bih.h
-engine/engine.h.gch: engine/texture.h engine/model.h
-fpsgame/game.h.gch: shared/cube.h shared/tools.h shared/geom.h shared/ents.h
-fpsgame/game.h.gch: shared/command.h shared/glexts.h shared/glemu.h
-fpsgame/game.h.gch: shared/iengine.h shared/igame.h fpsgame/ai.h
-
-shared/crypto-standalone.o: shared/cube.h shared/tools.h shared/geom.h
-shared/crypto-standalone.o: shared/ents.h shared/command.h shared/iengine.h
-shared/crypto-standalone.o: shared/igame.h
-shared/stream-standalone.o: shared/cube.h shared/tools.h shared/geom.h
-shared/stream-standalone.o: shared/ents.h shared/command.h shared/iengine.h
-shared/stream-standalone.o: shared/igame.h
-shared/tools-standalone.o: shared/cube.h shared/tools.h shared/geom.h
-shared/tools-standalone.o: shared/ents.h shared/command.h shared/iengine.h
-shared/tools-standalone.o: shared/igame.h
-engine/command-standalone.o: engine/engine.h shared/cube.h shared/tools.h
-engine/command-standalone.o: shared/geom.h shared/ents.h shared/command.h
-engine/command-standalone.o: shared/iengine.h shared/igame.h engine/world.h
-engine/server-standalone.o: engine/engine.h shared/cube.h shared/tools.h
-engine/server-standalone.o: shared/geom.h shared/ents.h shared/command.h
-engine/server-standalone.o: shared/iengine.h shared/igame.h engine/world.h
-engine/worldio-standalone.o: engine/engine.h shared/cube.h shared/tools.h
-engine/worldio-standalone.o: shared/geom.h shared/ents.h shared/command.h
-engine/worldio-standalone.o: shared/iengine.h shared/igame.h engine/world.h
-fpsgame/entities-standalone.o: fpsgame/game.h shared/cube.h shared/tools.h
-fpsgame/entities-standalone.o: shared/geom.h shared/ents.h shared/command.h
-fpsgame/entities-standalone.o: shared/iengine.h shared/igame.h fpsgame/ai.h
-fpsgame/server-standalone.o: fpsgame/game.h shared/cube.h shared/tools.h
-fpsgame/server-standalone.o: shared/geom.h shared/ents.h shared/command.h
-fpsgame/server-standalone.o: shared/iengine.h shared/igame.h fpsgame/ai.h
-fpsgame/server-standalone.o: fpsgame/capture.h fpsgame/ctf.h
-fpsgame/server-standalone.o: fpsgame/collect.h fpsgame/extinfo.h
-fpsgame/server-standalone.o: fpsgame/aiman.h
-engine/master-standalone.o: shared/cube.h shared/tools.h shared/geom.h
-engine/master-standalone.o: shared/ents.h shared/command.h shared/iengine.h
-engine/master-standalone.o: shared/igame.h

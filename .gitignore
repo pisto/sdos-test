@@ -1,0 +1,5 @@
+/sauer_client
+/sauerbraten
+/sauerbraten.exe
+*/*.o
+*/*.res
