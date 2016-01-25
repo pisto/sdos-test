@@ -780,6 +780,7 @@ static GLenum textype(GLenum &component, GLenum &format)
 
         case GL_RGB5_A1:
         case GL_RGBA8:
+        case GL_RGB10_A2:
         case GL_RGBA16:
         case GL_COMPRESSED_RGBA:
         case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
@@ -823,6 +824,7 @@ static GLenum textype(GLenum &component, GLenum &format)
             break;
 
         case GL_ALPHA8:
+        case GL_ALPHA16:
         case GL_COMPRESSED_ALPHA:
             if(!format) format = GL_ALPHA;
             break;
