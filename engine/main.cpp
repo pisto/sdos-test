@@ -70,7 +70,8 @@ void fatal(const char *s, ...)    // failure exit
 
 VAR(overridedata, 0, 1, 1);
 extern bool addzip(const char *name, const char *mount = NULL, const char *strip = NULL, FILE *opened = NULL);
-extern char _binary_data_zip_start[], _binary_data_zip_end[];
+extern char data_zip[];
+extern unsigned int data_zip_len;
 
 int curtime = 0, lastmillis = 1, elapsedtime = 0, totalmillis = 1;
 
@@ -1123,7 +1124,7 @@ int main(int argc, char **argv)
     {
         FILE* f = tmpfile();
         if(!f) fatal("Cannot create temporary file for data/");
-        fwrite(_binary_data_zip_start, _binary_data_zip_end - _binary_data_zip_start, 1, f);
+        fwrite(data_zip, data_zip_len, 1, f);
         fseek(f, 0, SEEK_SET);
         addzip("data-svn", 0, 0, f);
     }

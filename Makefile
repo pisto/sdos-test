@@ -84,7 +84,7 @@ data.zip:
 	zip -qr9 data data
 
 datazip.o: data.zip
-	$(LD) -r -b binary -o datazip.o data.zip
+	zip -qr9 - data | xxd -i data.zip - | $(CC) $(CFLAGS) -x c -c -o datazip.o -
 
 ifdef WINDOWS
 client: $(CLIENT_OBJS)
