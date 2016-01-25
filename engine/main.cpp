@@ -1123,7 +1123,7 @@ int main(int argc, char **argv)
     if(overridedata)
     {
         FILE* f = tmpfile();
-        if(!f) fatal("Cannot create temporary file for data/");
+        if(!f) fatal("Cannot create temporary file for data/: %s", strerror(errno));
         fwrite(data_zip, data_zip_len, 1, f);
         fseek(f, 0, SEEK_SET);
         addzip("data-svn", 0, "data-svn/", f);
