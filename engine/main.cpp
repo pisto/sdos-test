@@ -1276,6 +1276,8 @@ int main(int argc, char **argv)
     inputgrab(grabinput = true);
     ignoremousemotion();
 
+    conoutf("C2SVN edition.");
+
     for(;;)
     {
         static int frames = 0;
