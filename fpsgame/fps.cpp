@@ -973,7 +973,7 @@ namespace game
 
     bool serverinfoentry(g3d_gui *g, int i, const char *name, int port, const char *sdesc, const char *map, int ping, const vector<int> &attr, int np)
     {
-        if(ping < 0 || attr.empty() || attr[0]!=PROTOCOL_VERSION)
+        if(ping < 0 || attr.empty() || (attr[0]!=PROTOCOL_VERSION && attr[0] != PROTOCOL_VERSION_COLLECT))
         {
             switch(i)
             {

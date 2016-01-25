@@ -280,6 +280,7 @@ static const int msgsizes[] =               // size inclusive message token, 0 f
 #define SAUERBRATEN_SERVINFO_PORT 28786
 #define SAUERBRATEN_MASTER_PORT 28787
 #define PROTOCOL_VERSION 260            // bump when protocol changes
+#define PROTOCOL_VERSION_COLLECT 259
 #define DEMO_VERSION 1                  // bump when demo format changes
 #define DEMO_MAGIC "SAUERBRATEN_DEMO"
 
@@ -663,6 +664,15 @@ namespace entities
 
 namespace game
 {
+    extern bool collectserver;
+    inline int collect2next(int op)
+    {
+        return op + (collectserver && op >= N_EDITVSLOT ? 3 : 0);
+    }
+    inline int next2collect(int op)
+    {
+        return op - (collectserver && op >= N_EDITVSLOT ? 3 : 0);
+    }
     struct clientmode
     {
         virtual ~clientmode() {}

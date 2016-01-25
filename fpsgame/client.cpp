@@ -602,7 +602,7 @@ namespace game
             inlen = outlen = 0;
         }
         packetbuf p(16 + outlen, ENET_PACKET_FLAG_RELIABLE);
-        putint(p, N_CLIPBOARD);
+        putint(p, next2collect(N_CLIPBOARD));
         putint(p, inlen);
         putint(p, outlen);
         if(outlen > 0) p.put(outbuf, outlen);
@@ -658,7 +658,7 @@ namespace game
                 if(addmsg(N_EDITF + op, "ri9i6",
                     sel.o.x, sel.o.y, sel.o.z, sel.s.x, sel.s.y, sel.s.z, sel.grid, sel.orient,
                     sel.cx, sel.cxs, sel.cy, sel.cys, sel.corner,
-                    tex1 ? tex1 : arg1, arg2))
+                    tex1 ? tex1 : arg1, arg2) && !collectserver)
                 {
                     messages.pad(2);
                     int offset = messages.length();
@@ -673,7 +673,7 @@ namespace game
                 if(addmsg(N_EDITF + op, "ri9i7",
                     sel.o.x, sel.o.y, sel.o.z, sel.s.x, sel.s.y, sel.s.z, sel.grid, sel.orient,
                     sel.cx, sel.cxs, sel.cy, sel.cys, sel.corner,
-                    tex1 ? tex1 : arg1, tex2 ? tex2 : arg2, arg3))
+                    tex1 ? tex1 : arg1, tex2 ? tex2 : arg2, arg3) && !collectserver)
                 {
                     messages.pad(2);
                     int offset = messages.length();
@@ -690,6 +690,7 @@ namespace game
             }
             case EDIT_VSLOT:
             {
+                if(collectserver) break;
                 if(addmsg(N_EDITF + op, "ri9i6",
                     sel.o.x, sel.o.y, sel.o.z, sel.s.x, sel.s.y, sel.s.z, sel.grid, sel.orient,
                     sel.cx, sel.cxs, sel.cy, sel.cys, sel.corner,
@@ -705,6 +706,7 @@ namespace game
             case EDIT_UNDO:
             case EDIT_REDO:
             {
+                if(collectserver) break;
                 uchar *outbuf = NULL;
                 int inlen = 0, outlen = 0;
                 if(packundo(op, inlen, outbuf, outlen))
@@ -800,13 +802,14 @@ namespace game
     // collect c2s messages conveniently
     vector<uchar> messages;
     int messagecn = -1, messagereliable = false;
+    bool collectserver = false;
 
     bool addmsg(int type, const char *fmt, ...)
     {
         if(!connected) return false;
         static uchar buf[MAXTRANS];
         ucharbuf p(buf, sizeof(buf));
-        putint(p, type);
+        putint(p, next2collect(type));
         int numi = 1, numf = 0, nums = 0, mcn = -1;
         bool reliable = false;
         if(fmt)
@@ -856,7 +859,7 @@ namespace game
         {
             static uchar mbuf[16];
             ucharbuf m(mbuf, sizeof(mbuf));
-            putint(m, N_FROMAI);
+            putint(m, next2collect(N_FROMAI));
             putint(m, mcn);
             messages.put(mbuf, m.length());
             messagecn = mcn;
@@ -906,6 +909,7 @@ namespace game
             nextmode = gamemode = INT_MAX;
             clientmap[0] = '\0';
         }
+        collectserver = false;
     }
 
     void toserver(char *text) { conoutf(CON_CHAT, "%s:\f0 %s", colorname(player1), text); addmsg(N_TEXT, "rcs", player1, text); }
@@ -918,7 +922,7 @@ namespace game
 
     static void sendposition(fpsent *d, packetbuf &q)
     {
-        putint(q, N_POS);
+        putint(q, next2collect(N_POS));
         putuint(q, d->clientnum);
         // 3 bits phys state, 1 bit life sequence, 2 bits move, 2 bits strafe
         uchar physstate = d->physstate | ((d->lifesequence&1)<<3) | ((d->move&3)<<4) | ((d->strafe&3)<<6);
@@ -1008,7 +1012,7 @@ namespace game
             p.reliable();
             sendcrc = false;
             const char *mname = getclientmap();
-            putint(p, N_MAPCRC);
+            putint(p, next2collect(N_MAPCRC));
             sendstring(mname, p);
             putint(p, mname[0] ? getmapcrc() : 0);
         }
@@ -1029,7 +1033,7 @@ namespace game
         }
         if(totalmillis-lastping>250)
         {
-            putint(p, N_PING);
+            putint(p, next2collect(N_PING));
             putint(p, totalmillis);
             lastping = totalmillis;
         }
@@ -1049,7 +1053,7 @@ namespace game
     void sendintro()
     {
         packetbuf p(MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
-        putint(p, N_CONNECT);
+        putint(p, next2collect(N_CONNECT));
         sendstring(player1->name, p);
         putint(p, player1->playermodel);
         string hash = "";
@@ -1237,14 +1241,19 @@ namespace game
         int type;
         bool mapchanged = false, demopacket = false;
 
-        while(p.remaining()) switch(type = getint(p))
+        while(p.remaining()) switch(type = collect2next(getint(p)))
         {
             case N_DEMOPACKET: demopacket = true; break;
 
             case N_SERVINFO:                   // welcome messsage from the server
             {
                 int mycn = getint(p), prot = getint(p);
-                if(prot!=PROTOCOL_VERSION)
+                if(prot == PROTOCOL_VERSION_COLLECT)
+                {
+                    collectserver = true;
+                    conoutf("Collect edition server, legacy mode activated");
+                }
+                else if(prot!=PROTOCOL_VERSION)
                 {
                     conoutf(CON_ERROR, "you are using a different game protocol (you: %d, server: %d)", PROTOCOL_VERSION, prot);
                     disconnect();
@@ -1645,6 +1654,10 @@ namespace game
                     {
                         int tex = getint(p),
                             allfaces = getint(p);
+                        if(collectserver)
+                        {
+                            if(sel.validate()) mpedittex(tex, allfaces, sel, false); break;
+                        }
                         if(p.remaining() < 2) return;
                         int extra = lilswap(*(const ushort *)p.pad(2));
                         if(p.remaining() < extra) return;
@@ -1662,6 +1675,10 @@ namespace game
                         int oldtex = getint(p),
                             newtex = getint(p),
                             insel = getint(p);
+                        if(collectserver)
+                        {
+                            if(sel.validate()) mpreplacetex(oldtex, newtex, insel>0, sel, false); break;
+                        }
                         if(p.remaining() < 2) return;
                         int extra = lilswap(*(const ushort *)p.pad(2));
                         if(p.remaining() < extra) return;
@@ -1911,7 +1928,7 @@ namespace game
                     answerchallenge(a->key, text, buf);
                     //conoutf(CON_DEBUG, "answering %u, challenge %s with %s", id, text, buf.getbuf());
                     packetbuf p(MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
-                    putint(p, N_AUTHANS);
+                    putint(p, next2collect(N_AUTHANS));
                     sendstring(a->desc, p);
                     putint(p, id);
                     sendstring(buf.getbuf(), p);

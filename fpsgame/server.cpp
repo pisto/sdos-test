@@ -3669,7 +3669,7 @@ namespace server
 
     bool servercompatible(char *name, char *sdec, char *map, int ping, const vector<int> &attr, int np)
     {
-        return attr.length() && attr[0]==PROTOCOL_VERSION;
+        return attr.length() && (attr[0]==PROTOCOL_VERSION || attr[0] == PROTOCOL_VERSION_COLLECT);
     }
 
     #include "aiman.h"

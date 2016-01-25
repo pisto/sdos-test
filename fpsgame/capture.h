@@ -548,7 +548,7 @@ struct captureclientmode : clientmode
 
     void senditems(packetbuf &p)
     {
-        putint(p, N_BASES);
+        putint(p, next2collect(N_BASES));
         putint(p, bases.length());
         loopv(bases)
         {
