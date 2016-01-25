@@ -81,7 +81,7 @@ override LIBS+= -lenet -lSDL2 -lSDL2_image -ljpeg -lpng -lz -lSDL2_mixer -logg -
 endif
 
 data.zip:
-	zip -qr9 data data-svn
+	cd data-svn && zip -qr9 ../data.zip *
 
 datazip.o: data.zip
 	xxd -i data.zip - | $(CC) $(CFLAGS) -x c -c -o datazip.o -

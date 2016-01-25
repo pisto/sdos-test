@@ -1122,11 +1122,15 @@ int main(int argc, char **argv)
     }
     if(overridedata)
     {
+#ifdef WIN32
+        FILE* f = fopen("data-svn.zip", "w+b");
+#else
         FILE* f = tmpfile();
+#endif
         if(!f) fatal("Cannot create temporary file for data/: %s", strerror(errno));
         fwrite(data_zip, data_zip_len, 1, f);
         fseek(f, 0, SEEK_SET);
-        addzip("data-svn", 0, "data-svn/", f);
+        addzip("data-svn", 0, 0, f);
     }
 
     for(int i = 1; i<argc; i++)
