@@ -1,6 +1,7 @@
 // main.cpp: initialisation & main loop
 
 #include "engine.h"
+#include <cerrno>
 
 extern void cleargamma();
 
