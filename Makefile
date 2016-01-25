@@ -64,7 +64,8 @@ CLIENT_OBJS:= \
 	fpsgame/scoreboard.o \
 	fpsgame/server.o \
 	fpsgame/waypoint.o \
-	fpsgame/weapon.o
+	fpsgame/weapon.o \
+	datazip.o
 
 ifdef WINDOWS
 override LDFLAGS+= -mwindows
@@ -79,7 +80,11 @@ ifdef MAC
 override LIBS+= -lenet -lSDL2 -lSDL2_image -ljpeg -lpng -lz -lSDL2_mixer -logg -lvorbis -lvorbisfile -framework IOKit -framework Cocoa -framework CoreVideo -framework Carbon -framework CoreAudio -framework OpenGL -framework AudioUnit -lm -ldl
 endif
 
+data.zip:
+	zip -qr9 data data
 
+datazip.o: data.zip
+	$(LD) -r -b binary -o datazip.o data.zip
 
 ifdef WINDOWS
 client: $(CLIENT_OBJS)

@@ -262,7 +262,7 @@ static void mountzip(ziparchive &arch, vector<zipfile> &files, const char *mount
     }
 }
 
-bool addzip(const char *name, const char *mount = NULL, const char *strip = NULL)
+bool addzip(const char *name, const char *mount = NULL, const char *strip = NULL, FILE *opened = NULL)
 {
     string pname;
     copystring(pname, name);
@@ -277,7 +277,7 @@ bool addzip(const char *name, const char *mount = NULL, const char *strip = NULL
         return true;
     }
  
-    FILE *f = fopen(findfile(pname, "rb"), "rb");
+    FILE *f = opened ?: fopen(findfile(pname, "rb"), "rb");
     if(!f) 
     {
         conoutf(CON_ERROR, "could not open file %s", pname);

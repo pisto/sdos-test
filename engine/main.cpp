@@ -68,6 +68,10 @@ void fatal(const char *s, ...)    // failure exit
     exit(EXIT_FAILURE);
 }
 
+VAR(overridedata, 0, 1, 1);
+extern bool addzip(const char *name, const char *mount = NULL, const char *strip = NULL, FILE *opened = NULL);
+extern char _binary_data_zip_start[], _binary_data_zip_end[];
+
 int curtime = 0, lastmillis = 1, elapsedtime = 0, totalmillis = 1;
 
 dynent *player = NULL;
@@ -103,7 +107,7 @@ VARF(fsaa, -1, -1, 16, initwarning("anti-aliasing"));
 
 void writeinitcfg()
 {
-    stream *f = openutf8file("init.cfg", "w");
+    stream *f = openutf8file("init-svn.cfg", "w");
     if(!f) return;
     f->printf("// automatically written on exit, DO NOT MODIFY\n// modify settings in game\n");
     extern int fullscreen, fullscreendesktop;
@@ -117,6 +121,7 @@ void writeinitcfg()
     f->printf("soundchans %d\n", soundchans);
     f->printf("soundfreq %d\n", soundfreq);
     f->printf("soundbufferlen %d\n", soundbufferlen);
+    f->printf("overridedata %d\n", overridedata);
     delete f;
 }
 
@@ -1109,7 +1114,20 @@ int main(int argc, char **argv)
 			}
         }
     }
-    execfile("init.cfg", false);
+    if(!execfile("init-svn.cfg", false))
+    {
+        execfile("init.cfg", false);
+        logoutf("Loaded legacy init.cfg because init-svn.cfg was not present");
+    }
+    if(overridedata)
+    {
+        FILE* f = tmpfile();
+        if(!f) fatal("Cannot create temporary file for data/");
+        fwrite(_binary_data_zip_start, _binary_data_zip_end - _binary_data_zip_start, 1, f);
+        fseek(f, 0, SEEK_SET);
+        addzip("data-svn", 0, 0, f);
+    }
+
     for(int i = 1; i<argc; i++)
     {
         if(argv[i][0]=='-') switch(argv[i][1])
@@ -1214,8 +1232,12 @@ int main(int argc, char **argv)
     
     if(!execfile(game::savedconfig(), false)) 
     {
-        execfile(game::defaultconfig());
-        writecfg(game::restoreconfig());
+        if(execfile("config.cfg", false)) logoutf("Loaded legacy config.cfg because config-svn.cfg was not present");
+        else
+        {
+            execfile(game::defaultconfig());
+            writecfg(game::restoreconfig());
+        }
     }
     execfile(game::autoexec(), false);
 

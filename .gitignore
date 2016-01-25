@@ -1,5 +1,7 @@
 /sauer_client
 /sauerbraten
 /sauerbraten.exe
+data.zip
+datazip.o
 */*.o
 */*.res
