@@ -1124,7 +1124,10 @@ int main(int argc, char **argv)
     if(overridedata)
     {
 #ifdef WIN32
-        FILE* f = fopen("data-svn.zip", "w+b");
+        char tmppath[MAX_PATH + 256];
+        GetTempPath(sizeof(tmppath), tmppath);
+        concatstring(tmppath, "\\C2SVN-data-svn.zip");
+        FILE* f = fopen(tmppath, "w+b");
 #else
         FILE* f = tmpfile();
 #endif
