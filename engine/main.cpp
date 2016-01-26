@@ -588,12 +588,12 @@ void setupscreen()
     }
     curvsync = -1;
 
-    SDL_DisplayMode desktop;
-    if(SDL_GetDesktopDisplayMode(0, &desktop) < 0) fatal("failed querying desktop display mode: %s", SDL_GetError());
+    SDL_Rect desktop;
+    if(SDL_GetDisplayBounds(0, &desktop) < 0) fatal("failed querying desktop bounds: %s", SDL_GetError());
     desktopw = desktop.w;
     desktoph = desktop.h;
 
-    if(scr_h < 0) scr_h = fullscreen ? desktopw : SCR_DEFAULTH;
+    if(scr_h < 0) scr_h = fullscreen ? desktoph : SCR_DEFAULTH;
     if(scr_w < 0) scr_w = (scr_h*desktopw)/desktoph;
     scr_w = clamp(scr_w, SCR_MINW, SCR_MAXW);
     scr_h = clamp(scr_h, SCR_MINH, SCR_MAXH);
