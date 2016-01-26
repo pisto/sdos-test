@@ -1,0 +1,5 @@
+Linux: locate your saerubraten installation folder, and replace bin_unix/linux_64_client with bin64/sauer_client from this archive
+Windows: navigate to C:\Program Files (x86)\Sauerbraten\bin64, replace sauerbraten.exe with bin64\sauerbraten.exe from this archive
+OSX: locate your Sauerbraten icon, right-click on it, and click on "Show package contents", then navigate to Contents/MacOS and overwrite the sauerbraten executable with the one provided
+
+You might want to make a backup of the overwritten files.
