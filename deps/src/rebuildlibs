@@ -7,6 +7,7 @@ git clean -dfx ../$DEPSNAME
 read -p "git -clean -dfx? " -n 1 -r
 echo
 [[ $REPLY =~ ^[Yy]$ ]] && git clean -dfx .
+find . -exec touch -r . {} \;
 
 function compile {
 	(make -f configure.mk $1 PREFIX=$PREFIX && cd $1 && make -j $j install) || exit 1
