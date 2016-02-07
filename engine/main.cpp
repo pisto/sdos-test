@@ -1150,6 +1150,7 @@ int main(int argc, char **argv)
         fseek(f, 0, SEEK_SET);
         if(!addzip("data-svn", 0, 0, f)) fatal("Cannot add data-svn.zip in the lookup");
         execfile("data/C2SVNfixups.cfg", false);
+        conoutf("In case you want to use your own SVN data files use '/overridedata 0' and restart the client.");
     }
 
     for(int i = 1; i<argc; i++)
