@@ -319,6 +319,8 @@ void renderbackground(const char *caption, Texture *mapshot, const char *mapname
     if(!restore) setbackgroundinfo(caption, mapshot, mapname, mapinfo);
 }
 
+VAR(progressbackground, 0, 0, 1);
+
 float loadprogress = 0;
 
 void renderprogress(float bar, const char *text, GLuint tex, bool background)   // also used during loading
@@ -331,8 +333,8 @@ void renderprogress(float bar, const char *text, GLuint tex, bool background)   
     interceptkey(SDLK_UNKNOWN); // keep the event queue awake to avoid 'beachball' cursor
     #endif
 
-    extern int mesa_vsync_bug, curvsync;
-    bool forcebackground = mesa_vsync_bug && curvsync;
+    extern int mesa_swap_bug, curvsync;
+    bool forcebackground = progressbackground || (mesa_swap_bug && (curvsync || totalmillis==1));
     if(background || forcebackground) restorebackground(forcebackground);
 
     int w = screenw, h = screenh;
@@ -420,6 +422,8 @@ void renderprogress(float bar, const char *text, GLuint tex, bool background)   
 }
 
 int keyrepeatmask = 0, textinputmask = 0;
+Uint32 textinputtime = 0;
+VAR(textinputfilter, 0, 5, 1000);
 
 void keyrepeat(bool on, int mask)
 {
@@ -431,7 +435,11 @@ void textinput(bool on, int mask)
 {
     if(on)
     {
-        if(!textinputmask) SDL_StartTextInput();
+        if(!textinputmask)
+        {
+            SDL_StartTextInput();
+            textinputtime = SDL_GetTicks();
+        }
         textinputmask |= mask;
     }
     else
@@ -854,12 +862,13 @@ void checkinput()
                 return;
 
             case SDL_TEXTINPUT:
-            {
-                uchar buf[SDL_TEXTINPUTEVENT_TEXT_SIZE+1];
-                size_t len = decodeutf8(buf, sizeof(buf)-1, (const uchar *)event.text.text, strlen(event.text.text));
-                if(len > 0) { buf[len] = '\0'; processtextinput((const char *)buf, len); }
+                if(textinputmask && int(event.text.timestamp-textinputtime) >= textinputfilter)
+                {
+                    uchar buf[SDL_TEXTINPUTEVENT_TEXT_SIZE+1];
+                    size_t len = decodeutf8(buf, sizeof(buf)-1, (const uchar *)event.text.text, strlen(event.text.text));
+                    if(len > 0) { buf[len] = '\0'; processtextinput((const char *)buf, len); }
+                }
                 break;
-            }
 
             case SDL_KEYDOWN:
             case SDL_KEYUP:
