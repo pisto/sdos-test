@@ -1149,6 +1149,7 @@ int main(int argc, char **argv)
         fwrite(data_zip, data_zip_len, 1, f);
         fseek(f, 0, SEEK_SET);
         if(!addzip("data-svn", 0, 0, f)) fatal("Cannot add data-svn.zip in the lookup");
+        execfile("data/C2SVNfixups.cfg", false);
     }
 
     for(int i = 1; i<argc; i++)
