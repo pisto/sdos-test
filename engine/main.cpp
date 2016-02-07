@@ -1104,6 +1104,11 @@ int main(int argc, char **argv)
     char *load = NULL, *initscript = NULL;
 
     initing = INIT_RESET;
+#ifdef __APPLE__
+    defformatstring(gamedata, "%s/../gamedata/", SDL_GetBasePath());
+    chdir(gamedata);
+    sethomedir(SDL_GetPrefPath("", "sauerbraten"));
+#endif
     for(int i = 1; i<argc; i++)
     {
         if(argv[i][0]=='-') switch(argv[i][1])
