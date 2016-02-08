@@ -1106,9 +1106,10 @@ namespace game
     void parsepositions(ucharbuf &p)
     {
         int type;
-        while(p.remaining()) switch(type = collect2next(getint(p)))
+        bool demopacket = false;
+        while(p.remaining()) switch(type = collect2next(getint(p), demopacket && server::collectdemo))
         {
-            case N_DEMOPACKET: break;
+            case N_DEMOPACKET: demopacket = true; break;
             case N_POS:                        // position of another client
             {
                 int cn = getuint(p), physstate = p.get(), flags = getuint(p);
@@ -1241,7 +1242,7 @@ namespace game
         int type;
         bool mapchanged = false, demopacket = false;
 
-        while(p.remaining()) switch(type = collect2next(getint(p)))
+        while(p.remaining()) switch(type = collect2next(getint(p), demopacket && server::collectdemo))
         {
             case N_DEMOPACKET: demopacket = true; break;
 

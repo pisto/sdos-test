@@ -665,9 +665,9 @@ namespace entities
 namespace game
 {
     extern bool collectserver;
-    inline int collect2next(int op)
+    inline int collect2next(int op, bool force = false)
     {
-        return op + (collectserver && op >= N_EDITVSLOT ? 3 : 0);
+        return op + ((collectserver || force) && op >= N_EDITVSLOT ? 3 : 0);
     }
     inline int next2collect(int op)
     {
@@ -840,6 +840,7 @@ namespace game
 
 namespace server
 {
+    extern bool collectdemo;
     extern const char *modename(int n, const char *unknown = "unknown");
     extern const char *mastermodename(int n, const char *unknown = "unknown");
     extern void startintermission();

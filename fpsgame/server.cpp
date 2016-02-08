@@ -603,6 +603,7 @@ namespace server
 
     bool demonextmatch = false;
     stream *demotmp = NULL, *demorecord = NULL, *demoplayback = NULL;
+    bool collectdemo = false;
     int nextplayback = 0, demomillis = 0;
 
     VAR(maxdemos, 0, 5, 25);
@@ -1165,6 +1166,7 @@ namespace server
     {
         if(!demoplayback) return;
         DELETEP(demoplayback);
+        collectdemo = false;
 
         loopv(clients) sendf(clients[i]->clientnum, 1, "ri3", N_DEMOPLAYBACK, 0, clients[i]->clientnum);
 
@@ -1188,9 +1190,11 @@ namespace server
         {
             lilswap(&hdr.version, 2);
             if(hdr.version!=DEMO_VERSION) formatstring(msg, "demo \"%s\" requires an %s version of Cube 2: Sauerbraten", file, hdr.version<DEMO_VERSION ? "older" : "newer");
+            else if(hdr.protocol==PROTOCOL_VERSION_COLLECT) formatstring(msg, "demo \"%s\" was recorded with Collect edition", file), collectdemo = true;
             else if(hdr.protocol!=PROTOCOL_VERSION) formatstring(msg, "demo \"%s\" requires an %s version of Cube 2: Sauerbraten", file, hdr.protocol<PROTOCOL_VERSION ? "older" : "newer");
         }
-        if(msg[0])
+        if(collectdemo) sendservmsg(msg);
+        else if(msg[0])
         {
             DELETEP(demoplayback);
             sendservmsg(msg);
