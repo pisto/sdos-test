@@ -1106,7 +1106,7 @@ namespace game
     void parsepositions(ucharbuf &p)
     {
         int type;
-        while(p.remaining()) switch(type = getint(p))
+        while(p.remaining()) switch(type = collect2next(getint(p)))
         {
             case N_DEMOPACKET: break;
             case N_POS:                        // position of another client
@@ -1964,7 +1964,7 @@ namespace game
     void receivefile(packetbuf &p)
     {
         int type;
-        while(p.remaining()) switch(type = getint(p))
+        while(p.remaining()) switch(type = collect2next(getint(p)))
         {
             case N_DEMOPACKET: return;
             case N_SENDDEMO:
