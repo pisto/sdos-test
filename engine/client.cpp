@@ -61,6 +61,7 @@ ICOMMAND(connectedport, "", (),
 
 void abortconnect()
 {
+    mod::unsetbouncervars(); //NEW
     if(!connpeer) return;
     game::connectfail();
     if(connpeer->state!=ENET_PEER_STATE_DISCONNECTED) enet_peer_reset(connpeer);
@@ -154,6 +155,7 @@ void disconnect(bool async, bool cleanup)
         curpeer = NULL;
         discmillis = 0;
         conoutf("disconnected");
+        mod::chat::servdisconnect(); //NEW
         game::gamedisconnect(cleanup);
         mainmenu = 1;
     }
@@ -271,4 +273,3 @@ void gets2c()           // get updates from the server
             break;
     }
 }
-

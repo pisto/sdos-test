@@ -40,7 +40,7 @@ enum
 
 enum { ID_VAR, ID_FVAR, ID_SVAR, ID_COMMAND, ID_ALIAS, ID_LOCAL };
 
-enum { IDF_PERSIST = 1<<0, IDF_OVERRIDE = 1<<1, IDF_HEX = 1<<2, IDF_READONLY = 1<<3, IDF_OVERRIDDEN = 1<<4, IDF_UNKNOWN = 1<<5, IDF_ARG = 1<<6 };
+enum { IDF_PERSIST = 1<<0, IDF_OVERRIDE = 1<<1, IDF_HEX = 1<<2, IDF_READONLY = 1<<3, IDF_OVERRIDDEN = 1<<4, IDF_UNKNOWN = 1<<5, IDF_ARG = 1<<6, IDF_MODVAR = 1<<7, IDF_IGNOREVAR = 1<<8, IDF_EVENTARG = 1<<9 }; //NEW IDF_MODVAR, IDF_IGNOREVAR, IDF_EVENTARG
 
 struct ident;
 
@@ -190,9 +190,12 @@ struct ident
 };
 
 extern void addident(ident *id);
+extern void pusharg(ident &id, const tagval &v, identstack &stack); //NEW
+extern void poparg(ident &id);                                      //NEW
 
 extern tagval *commandret;
 extern const char *intstr(int v);
+extern const char *hexstr(int v, bool iscolor = false); //NEW
 extern void intret(int v);
 extern const char *floatstr(float v);
 extern void floatret(float v);
@@ -214,6 +217,7 @@ static inline float parsefloat(const char *s)
 }
 
 static inline void intformat(char *buf, int v, int len = 20) { nformatstring(buf, len, "%d", v); }
+static inline void hexformat(char *buf, int v, bool iscolor = false) { nformatstring(buf, sizeof(string), iscolor ? "0x%06X" : "0x%08X", v); } //NEW
 static inline void floatformat(char *buf, float v, int len = 20) { nformatstring(buf, len, v==int(v) ? "%.1f" : "%.7g", v); }
 
 static inline const char *getstr(const identval &v, int type) 
@@ -267,18 +271,18 @@ inline void ident::getval(tagval &v) const
 }
 
 // nasty macros for registering script functions, abuses globals to avoid excessive infrastructure
-#define KEYWORD(name, type) UNUSED static bool __dummy_##name = addkeyword(type, #name)
-#define COMMANDN(name, fun, nargs) UNUSED static bool __dummy_##fun = addcommand(#name, (identfun)fun, nargs)
+#define KEYWORD(name, type) UNUSED static bool TOKENPASTE(__dummy_##name_, __COUNTER__) = addkeyword(type, #name)                       //NEW __COUNTER__
+#define COMMANDN(name, fun, nargs) UNUSED static bool TOKENPASTE(__dummy_##fun_, __COUNTER__) = addcommand(#name, (identfun)fun, nargs) //NEW __COUNTER__
 #define COMMAND(name, nargs) COMMANDN(name, name, nargs)
 
-#define _VAR(name, global, min, cur, max, persist)  int global = variable(#name, min, cur, max, &global, NULL, persist)
+#define _VAR(name, global, min, cur, max, persist) int global = variable(#name, min, cur, max, &global, NULL, persist)
 #define VARN(name, global, min, cur, max) _VAR(name, global, min, cur, max, 0)
 #define VARNP(name, global, min, cur, max) _VAR(name, global, min, cur, max, IDF_PERSIST)
 #define VARNR(name, global, min, cur, max) _VAR(name, global, min, cur, max, IDF_OVERRIDE)
 #define VAR(name, min, cur, max) _VAR(name, name, min, cur, max, 0)
 #define VARP(name, min, cur, max) _VAR(name, name, min, cur, max, IDF_PERSIST)
 #define VARR(name, min, cur, max) _VAR(name, name, min, cur, max, IDF_OVERRIDE)
-#define _VARF(name, global, min, cur, max, body, persist)  void var_##name(); int global = variable(#name, min, cur, max, &global, var_##name, persist); void var_##name() { body; }
+#define _VARF(name, global, min, cur, max, body, persist) static void var_##name(); int global = variable(#name, min, cur, max, &global, var_##name, persist); static void var_##name() { body; }
 #define VARFN(name, global, min, cur, max, body) _VARF(name, global, min, cur, max, body, 0)
 #define VARF(name, min, cur, max, body) _VARF(name, name, min, cur, max, body, 0)
 #define VARFP(name, min, cur, max, body) _VARF(name, name, min, cur, max, body, IDF_PERSIST)
@@ -291,7 +295,7 @@ inline void ident::getval(tagval &v) const
 #define HVAR(name, min, cur, max) _HVAR(name, name, min, cur, max, 0)
 #define HVARP(name, min, cur, max) _HVAR(name, name, min, cur, max, IDF_PERSIST)
 #define HVARR(name, min, cur, max) _HVAR(name, name, min, cur, max, IDF_OVERRIDE)
-#define _HVARF(name, global, min, cur, max, body, persist)  void var_##name(); int global = variable(#name, min, cur, max, &global, var_##name, persist | IDF_HEX); void var_##name() { body; }
+#define _HVARF(name, global, min, cur, max, body, persist) static void var_##name(); int global = variable(#name, min, cur, max, &global, var_##name, persist | IDF_HEX); static void var_##name() { body; }
 #define HVARFN(name, global, min, cur, max, body) _HVARF(name, global, min, cur, max, body, 0)
 #define HVARF(name, min, cur, max, body) _HVARF(name, name, min, cur, max, body, 0)
 #define HVARFP(name, min, cur, max, body) _HVARF(name, name, min, cur, max, body, IDF_PERSIST)
@@ -304,7 +308,7 @@ inline void ident::getval(tagval &v) const
 #define FVAR(name, min, cur, max) _FVAR(name, name, min, cur, max, 0)
 #define FVARP(name, min, cur, max) _FVAR(name, name, min, cur, max, IDF_PERSIST)
 #define FVARR(name, min, cur, max) _FVAR(name, name, min, cur, max, IDF_OVERRIDE)
-#define _FVARF(name, global, min, cur, max, body, persist) void var_##name(); float global = fvariable(#name, min, cur, max, &global, var_##name, persist); void var_##name() { body; }
+#define _FVARF(name, global, min, cur, max, body, persist) static void var_##name(); float global = fvariable(#name, min, cur, max, &global, var_##name, persist); static void var_##name() { body; }
 #define FVARFN(name, global, min, cur, max, body) _FVARF(name, global, min, cur, max, body, 0)
 #define FVARF(name, min, cur, max, body) _FVARF(name, name, min, cur, max, body, 0)
 #define FVARFP(name, min, cur, max, body) _FVARF(name, name, min, cur, max, body, IDF_PERSIST)
@@ -317,7 +321,7 @@ inline void ident::getval(tagval &v) const
 #define SVAR(name, cur) _SVAR(name, name, cur, 0)
 #define SVARP(name, cur) _SVAR(name, name, cur, IDF_PERSIST)
 #define SVARR(name, cur) _SVAR(name, name, cur, IDF_OVERRIDE)
-#define _SVARF(name, global, cur, body, persist) void var_##name(); char *global = svariable(#name, cur, &global, var_##name, persist); void var_##name() { body; }
+#define _SVARF(name, global, cur, body, persist) static void var_##name(); char *global = svariable(#name, cur, &global, var_##name, persist); static void var_##name() { body; }
 #define SVARFN(name, global, cur, body) _SVARF(name, global, cur, body, 0)
 #define SVARF(name, cur, body) _SVARF(name, name, cur, body, 0)
 #define SVARFP(name, cur, body) _SVARF(name, name, cur, body, IDF_PERSIST)
@@ -326,9 +330,51 @@ inline void ident::getval(tagval &v) const
 // anonymous inline commands, uses nasty template trick with line numbers to keep names unique
 #define ICOMMANDNS(name, cmdname, nargs, proto, b) template<int N> struct cmdname; template<> struct cmdname<__LINE__> { static bool init; static void run proto; }; bool cmdname<__LINE__>::init = addcommand(name, (identfun)cmdname<__LINE__>::run, nargs); void cmdname<__LINE__>::run proto \
     { b; }
+
 #define ICOMMANDN(name, cmdname, nargs, proto, b) ICOMMANDNS(#name, cmdname, nargs, proto, b)
 #define ICOMMANDNAME(name) _icmd_##name
 #define ICOMMAND(name, nargs, proto, b) ICOMMANDN(name, ICOMMANDNAME(name), nargs, proto, b)
 #define ICOMMANDSNAME _icmds_
 #define ICOMMANDS(name, nargs, proto, b) ICOMMANDNS(name, ICOMMANDSNAME, nargs, proto, b)
  
+//NEW
+#define MODVARN(name, global, min, cur, max) _VAR(name, global, min, cur, max, IDF_MODVAR)
+#define MODVARNP(name, global, min, cur, max) _VAR(name, global, min, cur, max, IDF_PERSIST|IDF_MODVAR)
+#define MODVARNR(name, global, min, cur, max) _VAR(name, global, min, cur, max, IDF_OVERRIDE|IDF_MODVAR)
+#define MODVAR(name, min, cur, max) _VAR(name, name, min, cur, max, IDF_MODVAR)
+#define MODVARP(name, min, cur, max) _VAR(name, name, min, cur, max, IDF_PERSIST|IDF_MODVAR)
+#define MODVARFN(name, global, min, cur, max, body) _VARF(name, global, min, cur, max, body, IDF_MODVAR)
+#define MODVARF(name, min, cur, max, body) _VARF(name, name, min, cur, max, body, IDF_MODVAR)
+#define MODVARFP(name, min, cur, max, body) _VARF(name, name, min, cur, max, body, IDF_PERSIST|IDF_MODVAR)
+#define MODVARFR(name, min, cur, max, body) _VARF(name, name, min, cur, max, body, IDF_OVERRIDE|IDF_MODVAR)
+#define MODHVARN(name, global, min, cur, max) _HVAR(name, global, min, cur, max, IDF_MODVAR)
+#define MODHVARNP(name, global, min, cur, max) _HVAR(name, global, min, cur, max, IDF_PERSIST|IDF_MODVAR)
+#define MODHVARNR(name, global, min, cur, max) _HVAR(name, global, min, cur, max, IDF_OVERRIDE|IDF_MODVAR)
+#define MODHVAR(name, min, cur, max) _HVAR(name, name, min, cur, max, IDF_MODVAR)
+#define MODHVARP(name, min, cur, max) _HVAR(name, name, min, cur, max, IDF_PERSIST|IDF_MODVAR)
+#define MODHVARR(name, min, cur, max) _HVAR(name, name, min, cur, max, IDF_OVERRIDE|IDF_MODVAR)
+#define MODHVARFN(name, global, min, cur, max, body) _HVARF(name, global, min, cur, max, body, IDF_MODVAR)
+#define MODHVARF(name, min, cur, max, body) _HVARF(name, name, min, cur, max, body, IDF_MODVAR)
+#define MODHVARFP(name, min, cur, max, body) _HVARF(name, name, min, cur, max, body, IDF_PERSIST|IDF_MODVAR)
+#define MODHVARFR(name, min, cur, max, body) _HVARF(name, name, min, cur, max, body, IDF_OVERRIDE|IDF_MODVAR)
+#define MODFVARN(name, global, min, cur, max) _FVAR(name, global, min, cur, max, IDF_MODVAR)
+#define MODFVARNP(name, global, min, cur, max) _FVAR(name, global, min, cur, max, IDF_PERSIST|IDF_MODVAR)
+#define MODFVARNR(name, global, min, cur, max) _FVAR(name, global, min, cur, max, IDF_OVERRIDE|IDF_MODVAR)
+#define MODFVAR(name, min, cur, max) _FVAR(name, name, min, cur, max, IDF_MODVAR)
+#define MODFVARP(name, min, cur, max) _FVAR(name, name, min, cur, max, IDF_PERSIST|IDF_MODVAR)
+#define MODFVARR(name, min, cur, max) _FVAR(name, name, min, cur, max, IDF_OVERRIDE|IDF_MODVAR)
+#define MODFVARFN(name, global, min, cur, max, body) _FVARF(name, global, min, cur, max, body, IDF_MODVAR)
+#define MODFVARF(name, min, cur, max, body) _FVARF(name, name, min, cur, max, body, IDF_MODVAR)
+#define MODFVARFP(name, min, cur, max, body) _FVARF(name, name, min, cur, max, body, IDF_PERSIST|IDF_MODVAR)
+#define MODFVARFR(name, min, cur, max, body) _FVARF(name, name, min, cur, max, body, IDF_OVERRIDE|IDF_MODVAR)
+#define MODSVARN(name, global, cur) _SVAR(name, global, cur, IDF_MODVAR)
+#define MODSVARNP(name, global, cur) _SVAR(name, global, cur, IDF_PERSIST|IDF_MODVAR)
+#define MODSVARNR(name, global, cur) _SVAR(name, global, cur, IDF_OVERRIDE|IDF_MODVAR)
+#define MODSVAR(name, cur) _SVAR(name, name, cur, IDF_MODVAR)
+#define MODSVARP(name, cur) _SVAR(name, name, cur, IDF_PERSIST|IDF_MODVAR)
+#define MODSVARR(name, cur) _SVAR(name, name, cur, IDF_OVERRIDE|IDF_MODVAR)
+#define MODSVARFN(name, global, cur, body) _SVARF(name, global, cur, body, IDF_MODVAR)
+#define MODSVARF(name, cur, body) _SVARF(name, name, cur, body, IDF_MODVAR)
+#define MODSVARFP(name, cur, body) _SVARF(name, name, cur, body, IDF_PERSIST|IDF_MODVAR)
+#define MODSVARFR(name, cur, body) _SVARF(name, name, cur, body, IDF_OVERRIDE|IDF_MODVAR)
+//NEW END

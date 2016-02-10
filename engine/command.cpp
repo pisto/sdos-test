@@ -311,7 +311,7 @@ void addident(ident *id)
     addident(*id);
 }
 
-static inline void pusharg(ident &id, const tagval &v, identstack &stack)
+void pusharg(ident &id, const tagval &v, identstack &stack) //NEW removed static inline
 {
     stack.val = id.val;
     stack.valtype = id.valtype;
@@ -321,7 +321,7 @@ static inline void pusharg(ident &id, const tagval &v, identstack &stack)
     cleancode(id);
 } 
 
-static inline void poparg(ident &id)
+void poparg(ident &id) //NEW removed static inline
 {
     if(!id.stack) return;
     identstack *stack = id.stack;
@@ -433,7 +433,7 @@ static inline void setalias(ident &id, tagval &v)
     if(id.valtype == VAL_STR) delete[] id.val.s;
     id.setval(v);
     cleancode(id);
-    id.flags = (id.flags & identflags) | identflags;
+    id.flags = (id.flags & IDF_EVENTARG) | (id.flags & identflags) | identflags; //NEW  (id.flags & IDF_EVENTARG) | 
 }
 
 static void setalias(const char *name, tagval &v)
@@ -824,6 +824,7 @@ static inline char *conc(tagval *v, int n, bool space)
     return conc(v, n, space, NULL, 0);
 }
 
+UNUSED //NEW
 static inline char *conc(tagval *v, int n, bool space, const char *prefix)
 {
     return conc(v, n, space, prefix, strlen(prefix));
@@ -1254,6 +1255,11 @@ done:
     
 static bool compileword(vector<uint> &code, const char *&p, int wordtype, char *&word, int &wordlen)
 {
+    //NEW
+#ifndef STANDALONE
+    CHECKCALLDEPTH(250, return false); //prevent "( " stackoverflows
+#endif
+    //NEW END
     skipcomments(p);
     switch(*p)
     {
@@ -2014,6 +2020,13 @@ static const uint *runcode(const uint *code, tagval &result)
                 {
                 noid:
                     if(checknumber(args[0].s)) goto litval;
+//NEW
+#if PROTOCOL_VERSION <= 259
+                    if(strcmp(args[0].s, "bypassheightmapcheck"))
+#else
+#error remove this code
+#endif
+//NEW END
                     debugcode("unknown command: %s", args[0].s);
                     forcenull(result);
                     goto forceresult;
@@ -2071,6 +2084,43 @@ exit:
     --rundepth;
     return code;
 }
+
+//NEW
+
+char *getcurrentcsfilename()
+{
+    extern const char *currentcfgfile;
+    return currentcfgfile ? newstring(currentcfgfile) : NULL;
+}
+
+const char *getcurrentcsfilenamep()
+{
+    extern const char *currentcfgfile;
+    return currentcfgfile ? currentcfgfile : NULL;
+}
+
+ident *getcsident(const char *name)
+{
+    return idents.access(name);
+}
+
+ICOMMAND(ifnotdeclared, "ss", (const char *name, const char *code), if(!getcsident(name)) execute(code));
+
+ident *getcsident(int i)
+{
+    if(!identmap.inrange(i)) return NULL;
+    return identmap[i];
+}
+
+ident *addcsident(const char *name)
+{
+    ident id;
+    memset(&id, 0, sizeof(ident));
+    id.name = newstring(name);
+    return addident(id);
+}
+
+//NEW END
                  
 void executeret(const uint *code, tagval &result)
 {
@@ -2184,14 +2234,29 @@ bool executebool(const char *p)
     return b;
 }
 
+const char *currentcfgfile = NULL; //NEW
+
 bool execfile(const char *cfgfile, bool msg)
 {
+    //NEW
+    static vector<const char *> files; //restore filename when nested
+    files.add(cfgfile);
+    currentcfgfile = cfgfile;
+#ifndef STANDALONE
+    if (cfgfile) mod::loadscripthook(cfgfile);
+#endif
+    //NEW END
     string s;
     copystring(s, cfgfile);
     char *buf = loadfile(path(s), NULL);
     if(!buf)
     {
         if(msg) conoutf(CON_ERROR, "could not read \"%s\"", cfgfile);
+        //NEW
+        files.pop();
+        if(!files.empty()) currentcfgfile = files.last();
+        else currentcfgfile = NULL;
+        //NEW END
         return false;
     }
     const char *oldsourcefile = sourcefile, *oldsourcestr = sourcestr;
@@ -2201,6 +2266,14 @@ bool execfile(const char *cfgfile, bool msg)
     sourcefile = oldsourcefile;
     sourcestr = oldsourcestr;
     delete[] buf;
+    //NEW
+#ifndef STANDALONE
+    if (cfgfile) mod::scriptloadedhook(cfgfile);
+#endif
+    files.pop();
+    if(!files.empty()) currentcfgfile = files.last();
+    else currentcfgfile = NULL;
+    //NEW END
     return true;
 }
 ICOMMAND(exec, "sb", (char *file, int *msg), intret(execfile(file, *msg != 0) ? 1 : 0));
@@ -2259,20 +2332,26 @@ bool validateblock(const char *s)
 }
 
 #ifndef STANDALONE
+static bool writemodvars = false; //NEW
+
 void writecfg(const char *name)
 {
     stream *f = openutf8file(path(name && name[0] ? name : game::savedconfig(), true), "w");
     if(!f) return;
-    f->printf("// automatically written on exit, DO NOT MODIFY\n// delete this file to have %s overwrite these settings\n// modify settings in game, or put settings in %s to override anything\n\n", game::defaultconfig(), game::autoexec());
-    game::writeclientinfo(f);
+    if(!writemodvars) f->printf("// automatically written on exit, DO NOT MODIFY\n// delete this file to have %s overwrite these settings\n// modify settings in game, or put settings in %s to override anything\n\n", game::defaultconfig(), game::autoexec()); //NEW if(!writemodvars)
+    else f->printf("// automatically written on exit, DO NOT MODIFY\n"); //NEW
+    if(!writemodvars) game::writeclientinfo(f); //NEW if(!writemodvars)
     f->printf("\n");
-    writecrosshairs(f);
+    if(!writemodvars) writecrosshairs(f); //NEW if(!writemodvars)
     vector<ident *> ids;
     enumerate(idents, ident, id, ids.add(&id));
     ids.sortname();
     loopv(ids)
     {
         ident &id = *ids[i];
+        if((id.flags&IDF_MODVAR) && !writemodvars) continue; //NEW
+        if(!(id.flags&IDF_MODVAR) && writemodvars) continue; //NEW
+        if((id.flags&IDF_IGNOREVAR)) continue; //NEW
         if(id.flags&IDF_PERSIST) switch(id.type)
         {
             case ID_VAR: f->printf("%s %d\n", escapeid(id), *id.storage.i); break;
@@ -2280,6 +2359,17 @@ void writecfg(const char *name)
             case ID_SVAR: f->printf("%s %s\n", escapeid(id), escapestring(*id.storage.s)); break;
         }
     }
+    //NEW
+    if(writemodvars)
+    {
+        extern void writemasterserverscfg(stream *f);
+        writemasterserverscfg(f);
+        gamemod::writetempnames(f);
+        mod::chat::writecerts(f);
+        delete f;
+        return;
+    }
+    //NEW END
     f->printf("\n");
     writebinds(f);
     f->printf("\n");
@@ -2299,6 +2389,15 @@ void writecfg(const char *name)
     f->printf("\n");
     writecompletions(f);
     delete f;
+    //NEW
+    if(!writemodvars)
+    {
+        writemodvars = true;
+        writecfg(game::wcconfig());
+        writemodvars = false;
+        return;
+    }
+    //NEW END
 }
 
 COMMAND(writecfg, "s");
@@ -2326,6 +2425,15 @@ const char *intstr(int v)
     return retbuf[retidx];
 }
 
+//NEW
+const char *hexstr(int v, bool iscolor)
+{
+    retidx = (retidx + 1)%4;
+    hexformat(retbuf[retidx], v, iscolor);
+    return retbuf[retidx];
+}
+//NEW END
+
 void intret(int v)
 {
     commandret->setint(v);
@@ -2349,6 +2457,12 @@ void floatret(float v)
 ICOMMAND(do, "e", (uint *body), executeret(body, *commandret));
 ICOMMAND(if, "tee", (tagval *cond, uint *t, uint *f), executeret(getbool(*cond) ? t : f, *commandret));
 ICOMMAND(?, "ttt", (tagval *cond, tagval *t, tagval *f), result(*(getbool(*cond) ? t : f)));
+
+//NEW
+static bool breakinst = false;
+static int isloop = 0;
+ICOMMAND(break, "", (), if(isloop) breakinst = true);
+//NEW END
 
 ICOMMAND(pushif, "rte", (ident *id, tagval *v, uint *code),
 {
@@ -2408,31 +2522,41 @@ ICOMMAND(loop, "rie", (ident *id, int *n, uint *body),
 {
     if(*n <= 0 || id->type!=ID_ALIAS) return;
     identstack stack;
+    isloop++; //NEW
     loopi(*n)
     {
         setiter(*id, i, stack);
         execute(body);
+        if(breakinst) break; //NEW
     }
+    isloop--; //NEW
+    breakinst = false; //NEW
     poparg(*id);
 });
 ICOMMAND(loopwhile, "riee", (ident *id, int *n, uint *cond, uint *body),
 {
     if(*n <= 0 || id->type!=ID_ALIAS) return;
     identstack stack;
+    isloop++; //NEW
     loopi(*n)
     {
         setiter(*id, i, stack);
         if(!executebool(cond)) break;
         execute(body);
+        if(breakinst) break; //NEW
     }
+    isloop--; //NEW
+    breakinst = false; //NEW
     poparg(*id);
 });
-ICOMMAND(while, "ee", (uint *cond, uint *body), while(executebool(cond)) execute(body));
+//ICOMMAND(while, "ee", (uint *cond, uint *body), while(executebool(cond)) execute(body)); //NEW commented
+ICOMMAND(while, "ee", (uint *cond, uint *body), isloop++; while(executebool(cond) && !breakinst) execute(body); isloop--; breakinst = false); //NEW
 
 char *loopconc(ident *id, int n, uint *body, bool space)
 {
     identstack stack;
     vector<char> s;
+    isloop++; //NEW
     loopi(n)
     {
         setiter(*id, i, stack);
@@ -2443,7 +2567,10 @@ char *loopconc(ident *id, int n, uint *body, bool space)
         if(space && i) s.add(' ');
         s.put(vstr, len);
         freearg(v);
+        if(breakinst) break; //NEW
     }
+    isloop--; //NEW
+    breakinst = false; //NEW
     if(n > 0) poparg(*id);
     s.add('\0');
     return newstring(s.getbuf(), s.length()-1);
@@ -2980,6 +3107,27 @@ ICOMMAND(div, "ii", (int *a, int *b), intret(*b ? *a / *b : 0));
 ICOMMAND(mod, "ii", (int *a, int *b), intret(*b ? *a % *b : 0));
 ICOMMAND(divf, "ff", (float *a, float *b), floatret(*b ? *a / *b : 0));
 ICOMMAND(modf, "ff", (float *a, float *b), floatret(*b ? fmod(*a, *b) : 0));
+//NEW
+#ifndef STANDALONE
+static void roundf_(float *a, int *b)
+{
+    string fmtbuf, buf, decbuf;
+    int ndec = clamp(*b, 0, 10);
+    mod::strtool fmt(fmtbuf, sizeof(fmtbuf));
+    fmt = "%.0";
+#ifdef WIN32
+    _itoa(ndec, decbuf, 10);
+#else
+    formatstring(decbuf, "%d", ndec);
+#endif
+    fmt += decbuf;
+    fmt += 'f';
+    formatstring(buf, fmt.getbuf(), *a);
+    result(buf);
+}
+COMMANDN(roundf, roundf_, "fi");
+#endif //STANDALONE
+//NEW END
 ICOMMAND(sin, "f", (float *a), floatret(sin(*a*RAD)));
 ICOMMAND(cos, "f", (float *a), floatret(cos(*a*RAD)));
 ICOMMAND(tan, "f", (float *a), floatret(tan(*a*RAD)));

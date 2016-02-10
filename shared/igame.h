@@ -24,6 +24,14 @@ namespace entities
 
 namespace game
 {
+    //NEW
+    extern int gamespeed;
+    extern bool gamepaused;
+    extern int gamemode;
+    extern int mastermode;
+    extern bool disableradar;
+    extern int filterservermod;
+    //NEW END
     extern void parseoptions(vector<const char *> &args);
 
     extern void gamedisconnect(bool cleanup);
@@ -46,7 +54,10 @@ namespace game
     extern const char *restoreconfig();
     extern const char *defaultconfig();
     extern const char *autoexec();
+    extern const char *wcautoexec(); //NEW
+    extern const char *wcconfig(); //NEW
     extern const char *savedservers();
+    extern const char *history(); //NEW
     extern void loadconfigs();
 
     extern void updateworld();
@@ -65,6 +76,10 @@ namespace game
     extern void preload();
     extern float abovegameplayhud(int w, int h);
     extern void gameplayhud(int w, int h);
+    extern void rendertimeleft(int w, int h, int fonth);                                       //NEW
+    extern void renderping(int w, int h, int fonth);                                           //NEW
+    extern void rendernetwork(int w, int h, int screenw, int screenh, int fonth);              //NEW
+    extern bool renderstatsdisplay(int conw, int conh, int FONTH, int woffset, int roffset);   //NEW
     extern bool canjump();
     extern bool allowmove(physent *d);
     extern void doattack(bool on);
@@ -88,7 +103,7 @@ namespace game
     extern void dynlighttrack(physent *owner, vec &o, vec &hud);
     extern bool serverinfostartcolumn(g3d_gui *g, int i);
     extern void serverinfoendcolumn(g3d_gui *g, int i);
-    extern bool serverinfoentry(g3d_gui *g, int i, const char *name, int port, const char *desc, const char *map, int ping, const vector<int> &attr, int np);
+    extern bool serverinfoentry(g3d_gui *g, bool &shown, int i, const char *name, int port, const char *desc, const char *map, int ping, const vector<int> &attr, int np, int servermod, const char *country, const char *countrycode); //NEW shown, servermod, country, countrycode
     extern bool needminimap();
 } 
  

@@ -29,7 +29,7 @@ struct menu : g3d_callback
         cgui = NULL;
     }
 
-    virtual void clear() 
+    virtual void clear()
     {
         if(onclear) { freecode(onclear); onclear = NULL; }
     }
@@ -80,7 +80,7 @@ struct delayedupdate
             default: return 0;
         }
     }
-   
+
     const char *getstring() const
     {
         switch(type)
@@ -104,7 +104,7 @@ struct delayedupdate
         }
     }
 };
-     
+
 static hashnameset<menu> guis;
 static vector<menu *> guistack;
 static vector<delayedupdate> updatelater;
@@ -114,7 +114,7 @@ VARP(menudistance,  16, 40,  256);
 VARP(menuautoclose, 32, 120, 4096);
 
 vec menuinfrontofplayer()
-{ 
+{
     vec dir;
     vecfromyawpitch(camera1->yaw, 0, 1, 0, dir);
     dir.mul(menudistance).add(camera1->o);
@@ -125,6 +125,18 @@ vec menuinfrontofplayer()
 void popgui()
 {
     menu *m = guistack.pop();
+    //NEW
+    if(m->name)
+    {
+        mod::event::run(mod::event::CLOSE_GUI, "s", m->name);
+        if(!strcmp(m->name, "extinfo")) cleanupextinfo();
+        else if(!strcmp(m->name, "servers")) game::disableradar = false;
+    }
+    extern bool disableplayerdisplay;
+    extern bool disablehwdisplay;
+    disableplayerdisplay = !guistack.empty();
+    disablehwdisplay = disableplayerdisplay;
+    //NEW END
     m->clear();
 }
 
@@ -136,10 +148,32 @@ void removegui(menu *m)
         m->clear();
         return;
     }
-}    
+}
 
 void pushgui(menu *m, int pos = -1)
 {
+    //NEW
+    if(m->name)
+    {
+        mod::event::run(mod::event::SHOW_GUI, "s", m->name);
+        if(!strcmp(m->name, "servers"))
+        {
+            game::disableradar = true;
+            extern bool disablehwdisplay;
+            disablehwdisplay = true;
+            goto rebind;
+        }
+        if(!strcmp(m->name, "player search") || !strcmp(m->name, "find players"))
+        {
+            rebind:;
+            rebindpingport();
+        }
+        extern bool disableplayerdisplay;
+        extern bool disablehwdisplay;
+        disableplayerdisplay = !!strcmp(m->name, "Player display settings");
+        disablehwdisplay = !!strcmp(m->name, "HW display settings");
+    }
+    //NEW END
     if(guistack.empty())
     {
         menupos = menuinfrontofplayer();
@@ -163,6 +197,13 @@ void restoregui(int pos)
     menustart = totalmillis;
 }
 
+//NEW
+bool menuexists(const char *name)
+{
+    return !!guis.access(name);
+}
+//NEW END
+
 void showgui(const char *name)
 {
     menu *m = guis.access(name);
@@ -177,17 +218,17 @@ void hidegui(const char *name)
     menu *m = guis.access(name);
     if(m) removegui(m);
 }
- 
+
 int cleargui(int n)
 {
     int clear = guistack.length();
-    if(mainmenu && !isconnected(true) && clear > 0 && guistack[0]->name && !strcmp(guistack[0]->name, "main")) 
+    if(mainmenu && !isconnected(true) && clear > 0 && guistack[0]->name && !strcmp(guistack[0]->name, "main"))
     {
         clear--;
         if(!clear) return 1;
     }
     if(n>0) clear = min(clear, n);
-    loopi(clear) popgui(); 
+    loopi(clear) popgui();
     if(!guistack.empty()) restoregui(guistack.length()-1);
     return clear;
 }
@@ -213,7 +254,7 @@ void guionclear(char *action)
 {
     if(guistack.empty()) return;
     menu *m = guistack.last();
-    if(m->onclear) { freecode(m->onclear); m->onclear = NULL; } 
+    if(m->onclear) { freecode(m->onclear); m->onclear = NULL; }
     if(action[0]) m->onclear = compilecode(action);
 }
 
@@ -247,7 +288,7 @@ void guibutton(char *name, char *action, char *icon)
     if(!cgui) return;
     bool hideicon = !strcmp(icon, "0");
     int ret = cgui->button(name, GUI_BUTTON_COLOR, hideicon ? NULL : (icon[0] ? icon : (strstr(action, "showgui") ? "menu" : "action")));
-    if(ret&G3D_UP) 
+    if(ret&G3D_UP)
     {
         updatelater.add().schedule(action[0] ? action : name);
         if(shouldclearmenu) clearlater = true;
@@ -309,6 +350,13 @@ void guititle(char *name)
     if(cgui) cgui->title(name, GUI_TITLE_COLOR);
 }
 
+//NEW
+void guititleleftalign(char *name)
+{
+    if(cgui) cgui->text(name, GUI_TITLE_COLOR);
+}
+//NEW END
+
 void guitab(char *name)
 {
     if(cgui) cgui->tab(name, GUI_TITLE_COLOR);
@@ -336,6 +384,23 @@ void guicolumn(int *col)
 {
     if(cgui) cgui->column(*col);
 }
+
+//NEW
+void guibackground(int *color, int *parentw, int *parenth)
+{
+    if(cgui) cgui->background(*color, *parentw, *parenth);
+}
+
+void guipushlist()
+{
+    if(cgui) cgui->pushlist();
+}
+
+void guipoplist()
+{
+    if(cgui) cgui->poplist();
+}
+//NEW END
 
 template<class T> static void updateval(char *var, T val, char *onchange)
 {
@@ -372,13 +437,13 @@ static float getfval(char *var)
     }
 }
 
-static const char *getsval(char *var)
+static const char *getsval(char *var, bool iscolor = false) //NEW iscolor bool iscolor = false
 {
     ident *id = readident(var);
     if(!id) return "";
     switch(id->type)
     {
-        case ID_VAR: return intstr(*id->storage.i);
+        case ID_VAR: return id->flags&IDF_HEX ? hexstr(*id->storage.i, iscolor) : intstr(*id->storage.i);  //NEW id->flags&IDF_HEX ? hexstr(*id->storage.i, iscolor) :
         case ID_FVAR: return floatstr(*id->storage.f);
         case ID_SVAR: return *id->storage.s;
         case ID_ALIAS: return id->getstr();
@@ -461,13 +526,21 @@ void guibitfield(char *name, char *var, int *mask, char *onchange)
 }
 
 //-ve length indicates a wrapped text field of any (approx 260 chars) length, |length| is the field width
-void guifield(char *var, int *maxlength, char *onchange)
-{   
+void guifield(char *var, int *maxlength, char *onchange, int *iscolor) //NEW iscolor
+{
     if(!cgui) return;
-    const char *initval = getsval(var);
-	char *result = cgui->field(var, GUI_BUTTON_COLOR, *maxlength ? *maxlength : 12, 0, initval);
-    if(result) updateval(var, result, onchange); 
+    const char *initval = getsval(var, *iscolor!=0); //NEW *iscolor
+	char *result = cgui->field(var, *iscolor ? getval(var) : GUI_BUTTON_COLOR, *maxlength ? *maxlength : 12, 0, initval); //NEW *iscolor ? getval(var) : 
+    if(result) updateval(var, result, onchange);
 }
+
+//NEW
+void guicolorfield(char *var, char *onchange)
+{
+    int maxlength = 8, iscolor = 1;
+    guifield(var, &maxlength, onchange, &iscolor);
+}
+//NEW END
 
 //-ve maxlength indicates a wrapped text field of any (approx 260 chars) length, |maxlength| is the field width
 void guieditor(char *name, int *maxlength, int *height, int *mode)
@@ -503,7 +576,7 @@ void guialign(int *align, uint *contents)
     cgui->pushlist();
     if(*align >= 0) cgui->spring();
     execute(contents);
-    if(*align == 0) cgui->spring(); 
+    if(*align == 0) cgui->spring();
     cgui->poplist();
 }
 
@@ -551,7 +624,7 @@ menu *guiserversmenu = NULL;
 void guiservers(uint *header, int *pagemin, int *pagemax)
 {
     extern const char *showservers(g3d_gui *cgui, uint *header, int pagemin, int pagemax);
-    if(cgui) 
+    if(cgui)
     {
         const char *command = showservers(cgui, header, *pagemin, *pagemax > 0 ? *pagemax : INT_MAX);
         if(command)
@@ -563,6 +636,28 @@ void guiservers(uint *header, int *pagemin, int *pagemax)
     }
 }
 
+//NEW
+menu *guiextinfomenu = NULL;
+
+void guiextinfo(uint *header)
+{
+    void showextinfo(g3d_gui &g, uint *header, mod::strtool& command);
+    if(cgui)
+    {
+        string cmdbuf;
+        mod::strtool command(cmdbuf, sizeof(cmdbuf));
+        showextinfo(*cgui, header, command);
+        if(!command.empty())
+        {
+            updatelater.add().schedule(command.getbuf());
+            if(shouldclearmenu) clearlater = true;
+            guiextinfomenu = clearlater || guistack.empty() ? NULL : guistack.last();
+        }
+    }
+}
+
+//NEW END
+
 void notifywelcome()
 {
     if(guiserversmenu)
@@ -570,12 +665,21 @@ void notifywelcome()
         if(guistack.length() && guistack.last() == guiserversmenu) clearguis();
         guiserversmenu = NULL;
     }
+    //NEW
+    if(guiextinfomenu)
+    {
+        if(guistack.length() && guistack.last() == guiextinfomenu) clearguis();
+        cleanupextinfo();
+        guiextinfomenu = NULL;
+    }
+    //NEW END
 }
- 
+
 COMMAND(newgui, "ssss");
 COMMAND(guibutton, "sss");
 COMMAND(guitext, "ss");
 COMMAND(guiservers, "eii");
+COMMAND(guiextinfo, "e"); //NEW
 ICOMMAND(cleargui, "i", (int *n), intret(cleargui(*n)));
 COMMAND(showgui, "s");
 COMMAND(hidegui, "s");
@@ -587,10 +691,14 @@ COMMAND(guimerge, "e");
 COMMAND(guilist, "e");
 COMMAND(guialign, "ie");
 COMMAND(guititle, "s");
+COMMAND(guititleleftalign, "s"); //NEW
 COMMAND(guibar,"");
 COMMAND(guistrut,"fi");
 COMMAND(guispring, "i");
 COMMAND(guicolumn, "i");
+COMMAND(guibackground, "iii"); //NEW
+COMMAND(guipushlist, "");      //NEW
+COMMAND(guipoplist, "");       //NEW
 COMMAND(guiimage,"ssfis");
 COMMAND(guislider,"sbbs");
 COMMAND(guilistslider, "sss");
@@ -599,7 +707,8 @@ COMMAND(guiradio,"ssfs");
 COMMAND(guibitfield, "ssis");
 COMMAND(guicheckbox, "ssffs");
 COMMAND(guitab, "s");
-COMMAND(guifield, "sis");
+COMMAND(guifield, "sisi");    //NEW sis -> sisi
+COMMAND(guicolorfield, "ss"); //NEW
 COMMAND(guikeyfield, "sis");
 COMMAND(guieditor, "siii");
 COMMAND(guicolor, "i");
@@ -626,7 +735,7 @@ void guimodelpreview(char *model, char *animspec, char *action, float *scale, in
     int anim = ANIM_ALL;
     if(animspec[0])
     {
-        if(isdigit(animspec[0])) 
+        if(isdigit(animspec[0]))
         {
             anim = parseint(animspec);
             if(anim >= 0) anim %= ANIM_INDEX;
@@ -740,7 +849,7 @@ void menuprocess()
     updatelater.shrink(0);
     if(wasmain > mainmenu || clearlater)
     {
-        if(wasmain > mainmenu || level==guistack.length()) clearguis(level); 
+        if(wasmain > mainmenu || level==guistack.length()) clearguis(level);
         clearlater = false;
     }
     if(mainmenu && !isconnected(true) && guistack.empty()) showgui("main");
@@ -760,8 +869,8 @@ void clearmainmenu()
 
 void g3d_mainmenu()
 {
-    if(!guistack.empty()) 
-    {   
+    if(!guistack.empty())
+    {
         extern int usegui2d;
         if(!mainmenu && !usegui2d && camera1->o.dist(menupos) > menuautoclose) cleargui();
         else g3d_addgui(guistack.last(), menupos, GUI_2D | GUI_FOLLOW);

@@ -1,5 +1,17 @@
 #include "game.h"
 
+//NEW
+#ifdef IS_BROKEN_MINGW49
+// Workaround for a weird bug either in Sauerbraten or in MinGW 4.9.0.
+// Something in here causes Sauerbraten on 32 Bit Windows to crash
+// when a bot is loaded. I have wasted hours in finding the bug,
+// but I am not able to. All I know is that it corrupts the (call)
+// stack.
+#pragma GCC push_options
+#pragma GCC optimize ("-O1")
+#endif //IS_BROKEN_MINGW49
+//NEW END
+
 extern int fog;
 
 namespace ai
@@ -149,7 +161,11 @@ namespace ai
         if(!d->name[0])
         {
             if(aidebug) conoutf("%s assigned to %s at skill %d", colorname(d, name), o ? colorname(o) : "?", sk);
-            else conoutf("\f0join:\f7 %s", colorname(d, name));
+            else
+            {
+                mod::event::run(mod::event::PLAYER_CONNECT, "ds", d->clientnum, d->name); //NEW
+                conoutf("\f0join:\f7 %s", colorname(d, name));
+            }
             resetthisguy = true;
         }
         else
@@ -1465,3 +1481,8 @@ namespace ai
     }
 }
 
+//NEW
+#ifdef IS_BROKEN_MINGW49
+#pragma GCC pop_options
+#endif //IS_BROKEN_MINGW49
+//NEW END

@@ -44,7 +44,7 @@ struct soundconfig
 struct soundchannel
 { 
     int id;
-    bool inuse;
+    atomic<bool> inuse; //NEW atomic<>
     vec loc; 
     soundslot *slot;
     extentity *ent; 

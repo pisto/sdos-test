@@ -743,7 +743,8 @@ TEXTCOMMAND(textinit, "sss", (char *name, char *file, char *initval), // loads i
         e->load();
     }
 });
- 
+TEXTCOMMAND(textset, "s", (char *val), top->clear(); top->insert(val);); //NEW
+
 #define PASTEBUFFER "#pastebuffer"
 
 TEXTCOMMAND(textcopy, "", (), editor *b = useeditor(PASTEBUFFER, EDITORFOREVER, false); top->copyselectionto(b););

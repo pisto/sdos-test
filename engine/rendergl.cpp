@@ -1942,6 +1942,9 @@ void gl_drawmainmenu(int w, int h)
     renderpostfx();
     
     g3d_render();
+
+    mod::event::run(mod::event::FRAME); //NEW
+
     gl_drawhud(w, h);
 }
 
@@ -2147,6 +2150,15 @@ VAR(statrate, 1, 200, 1000);
 
 FVARP(conscale, 1e-3f, 0.33f, 1e3f);
 
+//NEW
+namespace game
+{
+    extern int showtimeleft;
+    extern int showpingdisplay;
+    extern int shownetworkdisplay;
+}
+//NEW END
+
 void gl_drawhud(int w, int h)
 {
     if(forceaspect) w = int(ceil(h*forceaspect));
@@ -2231,6 +2243,16 @@ void gl_drawhud(int w, int h)
                 roffset += FONTH;
             }
 
+            //NEW
+            //render displays from right to left, otherwise indent of displays may be wrong
+            game::renderping(conw, conh, FONTH);
+            game::rendertimeleft(conw, conh, FONTH);
+            if(recorder::isrecording() && (showfps || game::showtimeleft || (isconnected(false, false) && (game::shownetworkdisplay || game::showpingdisplay)))) roffset += FONTH;
+            game::rendernetwork(conw, conh, screen->w, screen->h, FONTH);
+            if(!showfps && ((game::showtimeleft || (isconnected(false, false) && (game::shownetworkdisplay || game::showpingdisplay))))) roffset += FONTH;
+            if(game::renderstatsdisplay(conw, conh, FONTH, wallclock ? 220 : 0, roffset) && !wallclock) roffset += FONTH;
+            //NEW END
+
             if(wallclock)
             {
                 if(!walltime) { walltime = time(NULL); walltime -= totalmillis/1000; if(!walltime) walltime++; }
@@ -2249,7 +2271,7 @@ void gl_drawhud(int w, int h)
                     roffset += FONTH;
                 }
             }
-                       
+
             if(editmode || showeditstats)
             {
                 static int laststats = 0, prevstats[8] = { 0, 0, 0, 0, 0, 0, 0 }, curstats[8] = { 0, 0, 0, 0, 0, 0, 0 };
@@ -2312,7 +2334,9 @@ void gl_drawhud(int w, int h)
                     DELETEA(gameinfo);
                 }
             } 
-            
+
+            mod::event::run(mod::event::FRAME); //NEW
+
             pophudmatrix();
         }
 
@@ -2337,6 +2361,8 @@ void gl_drawhud(int w, int h)
     pophudmatrix();
 
     drawcrosshair(w, h);
+    gamemod::renderplayerdisplay(w, h, FONTH, w, h); //NEW
+    gamemod::renderhwdisplay(w, h, FONTH, w, h); //NEW
 
     glDisable(GL_BLEND);
 }

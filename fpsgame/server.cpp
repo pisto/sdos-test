@@ -603,7 +603,67 @@ namespace server
 
     bool demonextmatch = false;
     stream *demotmp = NULL, *demorecord = NULL, *demoplayback = NULL;
-    int nextplayback = 0, demomillis = 0;
+    int nextplayback = 0; //NEW removed demomillis = 0;
+
+    //NEW
+    int demomillis2 = 0;
+    bool demomillisjump = false;
+
+#ifndef STANDALONE
+    void demomillischanged()
+    {
+        if(!demoplayback)
+        {
+            mod::erroroutf_r("no demo playback");
+            return;
+        }
+        extern int demomillis;
+        int jumpmillis = demomillis-demomillis2;
+        if(jumpmillis < 0)
+        {
+            demomillis = demomillis2;
+            mod::erroroutf_r("going back in demos is not supported");
+            return;
+        }
+        game::adjusttimeleft(jumpmillis);
+        demomillis2 = demomillis;
+        demomillisjump = true;
+    }
+    MODVARF(demomillis, 0, 0, INT_MAX, demomillischanged());
+
+    void jumpto(const char *time)
+    {
+        if(!demoplayback)
+        {
+            mod::erroroutf_r("jumpto works only in demo playback");
+            return;
+        }
+        int min, sec = 0;
+        if(sscanf(time, "%d:%d", &min, &sec) < 1)
+        {
+            error:;
+            mod::erroroutf_r("format for jumpto is mm[:ss]");
+            return;
+        }
+        if(sec > 59) goto error;
+        int timeleft = game::gettimeleft();
+        int millis = (min*60*1000)+(sec*1000);
+        if(millis < 0) goto error;
+        if(millis > timeleft)
+        {
+            mod::erroroutf_r("going back in demos is not supported");
+            return;
+        }
+        int diffmillis = timeleft-millis;
+        demomillis += diffmillis;
+        game::adjusttimeleft(diffmillis);
+        demomillisjump = true;
+    }
+    COMMAND(jumpto, "s");
+#else
+    int demomillis = 0;
+#endif //STANDALONE
+    //NEW END
 
     VAR(maxdemos, 0, 5, 25);
     VAR(maxdemosize, 0, 16, 31);
@@ -1171,11 +1231,21 @@ namespace server
         sendservmsg("demo playback finished");
 
         loopv(clients) sendwelcome(clients[i]);
+
+#ifndef STANDALONE
+        game::gametimestamp = time(NULL);
+        mod::event::run(mod::event::DEMO_END); //NEW
+#endif  
     }
 
     void setupdemoplayback()
     {
         if(demoplayback) return;
+#ifndef STANDALONE
+        game::demohasextinfo = false; //NEW
+        game::demohasservertitle = false; //NEW
+        game::gametimestamp = 0; //NEW
+#endif
         demoheader hdr;
         string msg;
         msg[0] = '\0';
@@ -1200,6 +1270,7 @@ namespace server
         sendservmsgf("playing demo \"%s\"", file);
 
         demomillis = 0;
+        demomillis2 = 0; //NEW
         sendf(-1, 1, "ri3", N_DEMOPLAYBACK, 1, -1);
 
         if(demoplayback->read(&nextplayback, sizeof(nextplayback))!=sizeof(nextplayback))
@@ -1208,12 +1279,26 @@ namespace server
             return;
         }
         lilswap(&nextplayback, 1);
+
+#ifndef STANDALONE
+        mod::event::run(mod::event::DEMO_START); //NEW
+#endif
     }
 
     void readdemo()
     {
         if(!demoplayback) return;
         demomillis += curtime;
+        //NEW
+#ifndef STANDALONE
+        demomillis2 = demomillis;
+        struct ev
+        {
+            ev() { if(!demomillisjump) return; mod::event::run(mod::event::DEMOMILLISJUMP_START); }
+            ~ev() { if(!demomillisjump) return; mod::event::run(mod::event::DEMOMILLISJUMP_END); demomillisjump = false; }
+        } ev;
+#endif //STANDALONE
+        //NEW END
         while(demomillis>=nextplayback)
         {
             int chan, len;
@@ -1225,6 +1310,13 @@ namespace server
             }
             lilswap(&chan, 1);
             lilswap(&len, 1);
+            //NEW  don't allow demos to pass any size to malloc() in enet
+            if(uint(len) > (chan==2 ? 10*1024*1024u : MAXTRANS))
+            {
+                enddemoplayback();
+                return;
+            }
+            //NEW END
             ENetPacket *packet = enet_packet_create(NULL, len+1, 0);
             if(!packet || demoplayback->read(packet->data+1, len)!=size_t(len))
             {

@@ -869,6 +869,17 @@ bool hashstring(const char *str, char *result, int maxlen)
     return true;
 }
 
+//NEW
+bool hashstring(const char *str, const char *salt, string &hash)
+{
+    mod::strtool saltedstr = str;
+    saltedstr += salt;
+    if(!hashstring(saltedstr.str(), hash, sizeof(hash))) return false;
+    saltedstr.secureclear();
+    return true;
+}
+//NEW END
+
 void answerchallenge(const char *privstr, const char *challenge, vector<char> &answerstr)
 {
     gfint privkey;

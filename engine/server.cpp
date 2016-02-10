@@ -45,7 +45,6 @@ void logoutf(const char *fmt, ...)
     va_end(args);
 }
 
-
 static void writelog(FILE *file, const char *buf)
 {
     static uchar ubuf[512];
@@ -397,8 +396,22 @@ VARF(masterport, 1, server::masterport(), 0xFFFF, disconnectmaster());
 
 ENetSocket connectmaster(bool wait)
 {
+//NEW
+#ifndef STANDALONE
+    // use a variable-shadowing trick to prevent changing too much original code
+    extern const char *curmastername;
+    extern int curmasterport;
+    extern bool havemultiplemasterservers;
+    const char *originalmastername = mastername;
+    int originalmasterport = masterport;
+    const char *mastername = curmastername ? curmastername : originalmastername;
+    int masterport = curmastername ? curmasterport : originalmasterport;
+#else
+    static const bool havemultiplemasterservers = false;
+#endif //!STANDALONE
+//NEW END
     if(!mastername[0]) return ENET_SOCKET_NULL;
-    if(masteraddress.host == ENET_HOST_ANY)
+    if(masteraddress.host == ENET_HOST_ANY || havemultiplemasterservers) //NEW || havemultiplemasterservers
     {
         if(isdedicatedserver()) logoutf("looking up %s...", mastername);
         masteraddress.port = masterport;

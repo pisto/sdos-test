@@ -747,6 +747,8 @@ VARP(movieaccel, 0, 1, 1);
 VARP(moviesync, 0, 0, 1);
 FVARP(movieminquality, 0, 0, 1);
 
+extern float conscale; //NEW
+
 namespace recorder
 {
     static enum { REC_OK = 0, REC_USERHALT, REC_TOOSLOW, REC_FILERROR } state = REC_OK;
@@ -1130,7 +1132,7 @@ namespace recorder
         else if(totalsize >= 1e6) { totalsize /= 1e6; unit = "MB"; }
         else totalsize /= 1e3;
 
-        draw_textf("recorded %.1f%s %d%%", w*3-10*FONTH, h*3-FONTH-FONTH*3/2, totalsize, unit, int(calcquality()*100)); 
+        draw_textf("recorded %.1f%s %d%%", w*3-10*FONTH, h*3-FONTH-FONTH*3/2, totalsize, unit, int(calcquality()*100));
 
         glDisable(GL_BLEND);
     }

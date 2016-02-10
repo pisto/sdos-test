@@ -12,7 +12,7 @@ enum
     CON_GAMEINFO   = 1<<10,
     CON_FRAG_SELF  = 1<<11,
     CON_FRAG_OTHER = 1<<12,
-    CON_TEAMKILL   = 1<<13
+    CON_TEAMKILL   = 1<<13,
 };
 
 // network quantization scale
@@ -61,8 +61,8 @@ enum
 struct fpsentity : extentity
 {
     int triggerstate, lasttrigger;
-    
-    fpsentity() : triggerstate(TRIGGER_RESET), lasttrigger(0) {} 
+
+    fpsentity() : triggerstate(TRIGGER_RESET), lasttrigger(0) {}
 };
 
 enum { GUN_FIST = 0, GUN_SG, GUN_CG, GUN_RL, GUN_RIFLE, GUN_GL, GUN_PISTOL, GUN_FIREBALL, GUN_ICEBALL, GUN_SLIMEBALL, GUN_BITE, GUN_BARREL, NUMGUNS };
@@ -165,7 +165,7 @@ static struct gamemodeinfo
 enum { MM_AUTH = -1, MM_OPEN = 0, MM_VETO, MM_LOCKED, MM_PRIVATE, MM_PASSWORD, MM_START = MM_AUTH };
 
 static const char * const mastermodenames[] =  { "auth",   "open",   "veto",       "locked",     "private",    "password" };
-static const char * const mastermodecolors[] = { "",       "\f0",    "\f2",        "\f2",        "\f3",        "\f3" };
+static const char * const mastermodecolors[] = { "",       "\f0",    "\f2",        "\f1",        "\f3",        "\f3" }; //NEW locked: \f2 -> \f1
 static const char * const mastermodeicons[] =  { "server", "server", "serverlock", "serverlock", "serverpriv", "serverpriv" };
 
 // hardcoded sounds, defined in sounds.cfg
@@ -207,7 +207,7 @@ enum
     S_CHAINSAW_IDLE,
 
     S_HIT,
-    
+
     S_FLAGFAIL
 };
 
@@ -495,7 +495,7 @@ struct fpsstate
         }
         else if(m_sp)
         {
-            if(m_dmsp) 
+            if(m_dmsp)
             {
                 armourtype = A_BLUE;
                 armour = 25;
@@ -531,8 +531,15 @@ struct fpsstate
 
 struct fpsent : dynent, fpsstate
 {
+    //NEW
+#ifndef STANDALONE
+    mod::extinfo::playerv2 *extinfo;
+#endif //STANDALONE
+    const char *country, *countrycode;
+    //NEW END
     int weight;                         // affects the effectiveness of hitpush
     int clientnum, privilege, lastupdate, plag, ping;
+    float highresping; //NEW
     int lifesequence;                   // sequence id for each respawn, used in damage test
     int respawned, suicided;
     int lastpain;
@@ -542,7 +549,7 @@ struct fpsent : dynent, fpsstate
     int lasttaunt;
     int lastpickup, lastpickupmillis, lastbase, lastrepammo, flagpickup, tokens;
     vec lastcollect;
-    int frags, flags, deaths, totaldamage, totalshots;
+    int frags, flags, deaths, totaldamage, damagedealt, totalshots, teamkills; // NEW: damagedealt, teamkills
     editinfo *edit;
     float deltayaw, deltapitch, deltaroll, newyaw, newpitch, newroll;
     int smoothmillis;
@@ -554,9 +561,16 @@ struct fpsent : dynent, fpsstate
 
     vec muzzle;
 
-    fpsent() : weight(100), clientnum(-1), privilege(PRIV_NONE), lastupdate(0), plag(0), ping(0), lifesequence(0), respawned(-1), suicided(-1), lastpain(0), attacksound(-1), attackchan(-1), idlesound(-1), idlechan(-1), frags(0), flags(0), deaths(0), totaldamage(0), totalshots(0), edit(NULL), smoothmillis(-1), playermodel(-1), ai(NULL), ownernum(-1), muzzle(-1, -1, -1)
+    fpsent() : weight(100), clientnum(-1), privilege(PRIV_NONE), lastupdate(0), plag(0), ping(0), lifesequence(0), respawned(-1), suicided(-1), lastpain(0), attacksound(-1), attackchan(-1), idlesound(-1), idlechan(-1), frags(0), flags(0), deaths(0), totaldamage(0), damagedealt(0), totalshots(0), teamkills(0), edit(NULL), smoothmillis(-1), playermodel(-1), ai(NULL), ownernum(-1), muzzle(-1, -1, -1) //NEW: damagedealt(0), teamkills(0)
     {
         name[0] = team[0] = info[0] = 0;
+        //NEW
+#ifndef STANDALONE
+        extinfo = NULL;
+#endif //STANDALONE
+        resetcountry();
+        //NEW END
+        highresping = 0.0f;
         respawn();
     }
     ~fpsent()
@@ -564,8 +578,20 @@ struct fpsent : dynent, fpsstate
         freeeditinfo(edit);
         if(attackchan >= 0) stopsound(attacksound, attackchan);
         if(idlechan >= 0) stopsound(idlesound, idlechan);
+#ifndef STANDALONE
+        resetextinfo(); //NEW
+#endif //STANDALONE
         if(ai) delete ai;
     }
+    //NEW
+    fpsent(const fpsent &client)
+    {
+        *this = client;
+#ifndef STANDALONE
+        extinfo = NULL; //prevent double frees in destructor
+#endif //STANDALONE
+    }
+    //NEW END
 
     void hitpush(int damage, const vec &dir, fpsent *actor, int gun)
     {
@@ -604,6 +630,18 @@ struct fpsent : dynent, fpsstate
         stopattacksound();
         lastnode = -1;
     }
+
+    //NEW
+#ifndef STANDALONE
+    void resetextinfo() { DELETEP(extinfo); }
+#endif //STANDALONE
+
+    void resetcountry()
+    {
+        country = NULL;
+        countrycode = NULL;
+    }
+    //NEW END
 };
 
 struct teamscore
@@ -711,6 +749,7 @@ namespace game
     extern const char *teamcolorname(fpsent *d, const char *alt = "you");
     extern const char *teamcolor(const char *name, bool sameteam, const char *alt = NULL);
     extern const char *teamcolor(const char *name, const char *team, const char *alt = NULL);
+    extern const char *chatcolorname(fpsent *d); //NEW
     extern fpsent *pointatplayer();
     extern fpsent *hudplayer();
     extern fpsent *followingplayer();
@@ -723,13 +762,23 @@ namespace game
     extern void damaged(int damage, fpsent *d, fpsent *actor, bool local = true);
     extern void killed(fpsent *d, fpsent *actor);
     extern void timeupdate(int timeremain);
+    extern void adjusttimeleft(int millis); //NEW
+    extern int gettimeleft(); //NEW
     extern void msgsound(int n, physent *d = NULL);
     extern void drawicon(int icon, float x, float y, float sz = 120);
     const char *mastermodecolor(int n, const char *unknown);
     const char *mastermodeicon(int n, const char *unknown);
 
     // client
+    extern bool fullyconnected; //NEW
+    extern bool demoplayback; //NEW
+    extern bool demohasextinfo; //NEW
+    extern bool demohasservertitle; //NEW
+    extern bool hasextinfo; //NEW
+    extern time_t gametimestamp; //NEW
+    extern int mapstart; //NEW
     extern bool connected, remote, demoplayback;
+    extern ENetAddress demoserver; //NEW
     extern string servinfo;
     extern vector<uchar> messages;
 
@@ -806,6 +855,8 @@ namespace game
     extern void getbestteams(vector<const char *> &best);
     extern void clearteaminfo();
     extern void setteaminfo(const char *team, int frags);
+    extern teaminfo *getteaminfo(const char *team); //NEW
+    extern void rendercountry(g3d_gui &g, const char *code, const char *name, int mode, bool *clicked = NULL, int scoreboard = 0); //NEW
 
     // render
     struct playermodelinfo
