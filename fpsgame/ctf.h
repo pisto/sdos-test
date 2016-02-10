@@ -680,7 +680,7 @@ struct ctfclientmode : clientmode
 
     void senditems(packetbuf &p)
     {
-        putint(p, N_INITFLAGS);
+        putint(p, next2collect(N_INITFLAGS));
         if(m_hold)
         {
             putint(p, holdspawns.length());

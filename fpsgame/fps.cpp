@@ -1166,7 +1166,7 @@ namespace game
         shown = true;
         //NEW END
 
-        if(ping < 0 || attr.empty() || attr[0]!=PROTOCOL_VERSION)
+        if(ping < 0 || attr.empty() || (attr[0]!=PROTOCOL_VERSION && attr[0] != PROTOCOL_VERSION_COLLECT))
         {
             switch(i)
             {
@@ -1274,7 +1274,7 @@ namespace game
     void readgamedata(vector<char> &extras) {}
 
     const char *savedconfig() { return "test-config.cfg"; }
-    const char *restoreconfig() { return "restore.cfg"; }
+    const char *restoreconfig() { return "restore-svn.cfg"; }
     const char *defaultconfig() { return "data/defaults.cfg"; }
     const char *autoexec() { return "autoexec.cfg"; }
     const char *wcautoexec() { return "wcautoexec.cfg"; } //NEW

@@ -572,7 +572,7 @@ struct collectclientmode : clientmode
 
     void senditems(packetbuf &p)
     {
-        putint(p, N_INITTOKENS);
+        putint(p, next2collect(N_INITTOKENS));
         putint(p, bases.length());
         loopv(bases)
         {

@@ -217,7 +217,7 @@ namespace entities
         {
             sendposition(d);
             packetbuf p(32, ENET_PACKET_FLAG_RELIABLE);
-            putint(p, N_TELEPORT);
+            putint(p, next2collect(N_TELEPORT));
             putint(p, d->clientnum);
             putint(p, tp);
             putint(p, td);
@@ -247,7 +247,7 @@ namespace entities
         {
             sendposition(d);
             packetbuf p(16, ENET_PACKET_FLAG_RELIABLE);
-            putint(p, N_JUMPPAD);
+            putint(p, next2collect(N_JUMPPAD));
             putint(p, d->clientnum);
             putint(p, jp);
             sendclientpacket(p.finalize(), 0);
@@ -366,7 +366,7 @@ namespace entities
 
     void putitems(packetbuf &p)            // puts items in network stream and also spawns them locally
     {
-        putint(p, N_ITEMLIST);
+        putint(p, next2collect(N_ITEMLIST));
         loopv(ents) if(ents[i]->type>=I_SHELLS && ents[i]->type<=I_QUAD && (!m_noammo || ents[i]->type<I_SHELLS || ents[i]->type>I_CARTRIDGES))
         {
             putint(p, i);

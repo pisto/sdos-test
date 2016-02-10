@@ -1,6 +1,7 @@
 // main.cpp: initialisation & main loop
 
 #include "engine.h"
+#include <cerrno>
 
 extern void cleargamma();
 
@@ -79,6 +80,11 @@ void fatal(const char *s, ...)    // failure exit
     _exit(EXIT_FAILURE); //NEW exit -> _exit (do not run destructors)
 }
 
+VAR(overridedata, 0, 1, 1);
+extern bool addzip(const char *name, const char *mount = NULL, const char *strip = NULL, FILE *opened = NULL);
+extern char data_zip[];
+extern unsigned int data_zip_len;
+
 int curtime = 0, lastmillis = 1, elapsedtime = 0, totalmillis = 1;
 atomic<int> atotalmillis(1); //NEW
 
@@ -115,7 +121,7 @@ VARF(fsaa, -1, -1, 16, initwarning("anti-aliasing"));
 
 void writeinitcfg()
 {
-    stream *f = openutf8file("init.cfg", "w");
+    stream *f = openutf8file("init-svn.cfg", "w");
     if(!f) return;
     f->printf("// automatically written on exit, DO NOT MODIFY\n// modify settings in game\n");
     extern int fullscreen, fullscreendesktop;
@@ -129,6 +135,7 @@ void writeinitcfg()
     f->printf("soundchans %d\n", soundchans);
     f->printf("soundfreq %d\n", soundfreq);
     f->printf("soundbufferlen %d\n", soundbufferlen);
+    f->printf("overridedata %d\n", overridedata);
     delete f;
 }
 
@@ -1291,6 +1298,11 @@ int main(int argc, char **argv)
     char *load = NULL, *initscript = NULL;
 
     initing = INIT_RESET;
+#ifdef __APPLE__
+    defformatstring(gamedata, "%s/../gamedata/", SDL_GetBasePath());
+    chdir(gamedata);
+    sethomedir(SDL_GetPrefPath("", "sauerbraten"));
+#endif
     for(int i = 1; i<argc; i++)
     {
         if(argv[i][0]=='-') switch(argv[i][1])
@@ -1303,7 +1315,29 @@ int main(int argc, char **argv)
 			}
         }
     }
-    execfile("init.cfg", false);
+    if(!execfile("init-svn.cfg", false))
+    {
+        execfile("init.cfg", false);
+        logoutf("Loaded legacy init.cfg because init-svn.cfg was not present");
+    }
+    if(overridedata)
+    {
+#ifdef WIN32
+        char tmppath[MAX_PATH + 256];
+        GetTempPath(sizeof(tmppath), tmppath);
+        concatstring(tmppath, "\\C2SVN-data-svn.zip");
+        FILE* f = fopen(tmppath, "w+b");
+#else
+        FILE* f = tmpfile();
+#endif
+        if(!f) fatal("Cannot create temporary file for data/: %s", strerror(errno));
+        fwrite(data_zip, data_zip_len, 1, f);
+        fseek(f, 0, SEEK_SET);
+        if(!addzip("data-svn", 0, 0, f)) fatal("Cannot add data-svn.zip in the lookup");
+        execfile("data/C2SVNfixups.cfg", false);
+        conoutf("In case you want to use your own SVN data files use '/overridedata 0' and restart the client.");
+    }
+
     for(int i = 1; i<argc; i++)
     {
         if(argv[i][0]=='-') switch(argv[i][1])
@@ -1412,8 +1446,12 @@ int main(int argc, char **argv)
     execfile(game::wcconfig(), false); //NEW
     if(!execfile(game::savedconfig(), false)) 
     {
-        execfile(game::defaultconfig());
-        writecfg(game::restoreconfig());
+        if(execfile("config.cfg", false)) logoutf("Loaded legacy config.cfg because config-svn.cfg was not present");
+        else
+        {
+            execfile(game::defaultconfig());
+            writecfg(game::restoreconfig());
+        }
     }
     mod::chat::setupbinds();           //NEW
     mod::wcautocheckversion();         //NEW
