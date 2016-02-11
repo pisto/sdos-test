@@ -709,7 +709,8 @@ namespace searchdemo
     static SDL_mutex *searchmutex = NULL;
 
     static const int MAXTHREADS = 32;
-    MODVARP(searchdemothreadlimit, 1, min(guessnumcpus(), MAXTHREADS), min(guessnumcpus(), MAXTHREADS));
+    static const int cpucount = SDL_GetCPUCount();
+    MODVARP(searchdemothreadlimit, 1, min(cpucount, MAXTHREADS), min(cpucount, MAXTHREADS));
     MODVARP(searchdemomaxresults, 0, 100, 250);
     MODVARP(searchdemomindemosize, 0, 0, 0x7FFFFFFF);
     ICOMMAND(searchdemoactive, "", (), intret(searchdemothread ? 1 : 0));
@@ -877,7 +878,7 @@ namespace searchdemo
             lilswap(&hdr.version, 2);
 
             #ifndef IGNOREDEMOVERSION
-            if (hdr.version != DEMO_VERSION || hdr.protocol != PROTOCOL_VERSION)
+            if (hdr.version != DEMO_VERSION || (hdr.protocol != PROTOCOL_VERSION && hdr.protocol != PROTOCOL_VERSION_COLLECT))
                 RETURN_ERROR(ERROR_INVALID_DEMO_VERSION, "demo version");
             #endif
 
@@ -1192,7 +1193,7 @@ namespace searchdemo
 
         void createthread()
         {
-            thread = SDL_CreateThread(&checkdemothread, this);
+            thread = SDL_CreateThread(&checkdemothread, "demothread_t", this);
 
             if (!thread)
                 abort();
@@ -1389,7 +1390,7 @@ namespace searchdemo
             abort();
 
         demothread_t *threads[MAXTHREADS];
-        int threadcount = min(guessnumcpus(), min(files.length(), maxthreads));
+        int threadcount = min(SDL_GetCPUCount(), min(files.length(), maxthreads));
         loopi(threadcount) threads[i] = new demothread_t(fp, filecount, gamemode, servername, mapname, mindemosize, i+1, threadavailablecond);
 
         #define JOIN do { joinallthreads((checkdemo**)&threads, threadcount); } while(0)
@@ -1446,7 +1447,7 @@ namespace searchdemo
 
             char *demofile = files.remove(i);
 
-            nformatstring(thread->pd.demo, sizeof(string), "%s/%s.dmo", dir, demofile);
+            nformatstring((char*)thread->pd.demo, sizeof(string), "%s/%s.dmo", dir, demofile);
             thread->realdemofile = demofile;
             thread->pd.demoinfo = new demoinfo_t;
 
@@ -1836,7 +1837,7 @@ namespace searchdemo
 
         sdti->maxthreads = searchdemothreadlimit;
 
-        searchdemothread = SDL_CreateThread(&searchthread, sdti);
+        searchdemothread = SDL_CreateThread(&searchthread, "searchdemo", sdti);
 
         if (!searchdemothread)
             abort();

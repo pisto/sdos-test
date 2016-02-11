@@ -22,5 +22,6 @@ compile libvorbis
 compile libSDL
 compile libSDL_image
 compile libSDL_mixer
+compile libgeoip
 compile libressl
 compile libcurl

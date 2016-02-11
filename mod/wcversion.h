@@ -1,7 +1,7 @@
 #ifndef __WCVERSION_H__
 #define __WCVERSION_H__
 
-#define WCREVISION "$WCREVISION$"
+extern const char* WCREVISION;
 
 constexpr int WC_VERSION_MAJOR = 0;
 constexpr int WC_VERSION_MINOR = 8;
@@ -111,7 +111,7 @@ static inline clientversion parseclientversion(const char *version)
     return ver;
 }
 
-constexpr const char *getwcrevision()
+inline const char *getwcrevision()
 {
     return WCREVISION[0] == '$' ? "unknown" : WCREVISION;
 }

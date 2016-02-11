@@ -121,7 +121,7 @@ void renderplayerpreview(g3d_gui& g, strtool& command, const ENetAddress& eaddr,
     vector<teaminfo> teams;
     vector<playerinfo*> specs;
 
-    if (errstr.empty() && (protocol != PROTOCOL_VERSION || waiting))
+    if (errstr.empty() && ((protocol != PROTOCOL_VERSION && protocol != PROTOCOL_VERSION_COLLECT) || waiting))
     {
         if (!waiting)
         {

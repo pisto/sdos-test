@@ -22,7 +22,6 @@
 #include "cube.h"
 #include <curl/curl.h>
 #include LIB_GEOIP_HEADER
-#include "../last_sauer_svn_rev.h"
 
 #include <openssl/ssl.h>
 
@@ -31,6 +30,8 @@
 #include <mach/mach.h>
 #include <mach/mach_time.h>
 #endif
+
+extern int SAUERSVNREV;
 
 static struct
 {
@@ -67,11 +68,11 @@ namespace mod
     SDL_mutex *threadmutex = NULL;
     vector<threadmessage*> threadmessages;
     vector<cubescript> threadscripts;
-    atomic<Uint32> mainthreadid(-1);
+    atomic<SDL_threadID> mainthreadid(-1);
 
     bool ismainthread()
     {
-        if (SDL_ThreadID() == mainthreadid || mainthreadid == (Uint32)-1)
+        if (SDL_ThreadID() == mainthreadid || mainthreadid == (SDL_threadID)-1)
             return true;
 
         return false;
@@ -694,7 +695,7 @@ namespace mod
 
         if (!info)
         {
-            info << "WC NG version: " << CLIENTVERSION.str();
+            info << "WC NG C2SVN version: " << CLIENTVERSION.str();
             info << " (";
             if (strcmp(wcrev, "unknown")) info << wcrev << " / ";
             info << getosstring() << ")";

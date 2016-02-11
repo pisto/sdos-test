@@ -693,6 +693,6 @@ namespace gamemod
 
     bool validprotocolversion(int num)
     {
-        return (num == PROTOCOL_VERSION);
+        return (num == PROTOCOL_VERSION || num == PROTOCOL_VERSION_COLLECT);
     }
 }

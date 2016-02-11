@@ -563,35 +563,6 @@ static void setgamma(int val)
     if(screen && SDL_SetWindowBrightness(screen, val/100.0f) < 0) conoutf(CON_ERROR, "Could not set gamma: %s", SDL_GetError());
 }   
 
-/*
- * Added a new function to replace SDL_SetGamma() because SDL_SetGamma() does not work
- * on linux, or at least not with ATi cards
- */
-#ifdef __linux__
-MODSVARP(monitor, "DFP1");
-
-static const char *filtersysvar(char *p)
-{
-    char *x, *y = p;
-    for(x = p; *p; p++)
-    {
-        if((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') || (*p >= '1' && *p <= '9'))
-            *x++ = *p;
-    }
-    *x = '\0';
-    return y;
-}
-
-static int changegamma(float red, float green, float blue)
-{
-    defformatstring(cmd, "which xrandr >/dev/null && xrandr --output %s --gamma %f:%f:%f 2>/dev/null", filtersysvar(monitor), red, green, blue);
-    if(system(cmd)) return SDL_SetGamma(red, green, blue);
-    return 0;
-}
-
-#define SDL_SetGamma changegamma
-#endif //__linux__
-
 static int curgamma = 100;
 VARFP(gamma, 30, 100, 300,
 {

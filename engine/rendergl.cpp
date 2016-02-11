@@ -2265,7 +2265,7 @@ void gl_drawhud()
             game::renderping(conw, conh, FONTH);
             game::rendertimeleft(conw, conh, FONTH);
             if(recorder::isrecording() && (showfps || game::showtimeleft || (isconnected(false, false) && (game::shownetworkdisplay || game::showpingdisplay)))) roffset += FONTH;
-            game::rendernetwork(conw, conh, screen->w, screen->h, FONTH);
+            game::rendernetwork(conw, conh, screenw, screenh, FONTH);
             if(!showfps && ((game::showtimeleft || (isconnected(false, false) && (game::shownetworkdisplay || game::showpingdisplay))))) roffset += FONTH;
             if(game::renderstatsdisplay(conw, conh, FONTH, wallclock ? 220 : 0, roffset) && !wallclock) roffset += FONTH;
             //NEW END
