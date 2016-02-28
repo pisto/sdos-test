@@ -1414,7 +1414,8 @@ int main(int argc, char **argv)
     identflags |= IDF_PERSIST;
     
     initing = INIT_LOAD;
-    execfile(game::wcconfig(), false); //NEW
+    if(!execfile(game::wcconfig(), false)) //NEW
+        if(execfile("wc-ng.cfg", false)) logoutf("Loaded legacy wc-ng.cfg because wc-ng-svn.cfg was not present");
     if(!execfile(game::savedconfig(), false)) 
     {
         if(execfile("config.cfg", false)) logoutf("Loaded legacy config.cfg because config-svn.cfg was not present");

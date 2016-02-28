@@ -1273,12 +1273,12 @@ namespace game
     void writegamedata(vector<char> &extras) {}
     void readgamedata(vector<char> &extras) {}
 
-    const char *savedconfig() { return "test-config.cfg"; }
+    const char *savedconfig() { return "config-svn.cfg"; }
     const char *restoreconfig() { return "restore-svn.cfg"; }
     const char *defaultconfig() { return "data/defaults.cfg"; }
     const char *autoexec() { return "autoexec.cfg"; }
     const char *wcautoexec() { return "wcautoexec.cfg"; } //NEW
-    const char *wcconfig() { return "wc-ng.cfg"; } //NEW
+    const char *wcconfig() { return "wc-ng-svn.cfg"; } //NEW
     const char *savedservers() { return "servers.cfg"; }
     const char *history() { return "history"; }
 
