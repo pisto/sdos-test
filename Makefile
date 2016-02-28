@@ -97,17 +97,17 @@ datazip.o: data.zip
 ifdef WINDOWS
 client: $(CLIENT_OBJS)
 	$(WINDRES) -I vcpp -i vcpp/mingw.rc -J rc -o vcpp/mingw.res -O coff 
-	$(CXX) -static $(CXXFLAGS) $(LDFLAGS) -o sauerbraten.exe vcpp/mingw.res $(CLIENT_OBJS) -Wl,--as-needed -Wl,--start-group $(LIBS) -Wl,--end-group
-	$(STRIP) sauerbraten.exe
-	-$(UPX) sauerbraten.exe
+	$(CXX) -static $(CXXFLAGS) $(LDFLAGS) -o sauerbraten_wc.exe vcpp/mingw.res $(CLIENT_OBJS) -Wl,--as-needed -Wl,--start-group $(LIBS) -Wl,--end-group
+	$(STRIP) sauerbraten_wc.exe
+	-$(UPX) sauerbraten_wc.exe
 endif
 
 ifdef MAC
 
 client:	$(CLIENT_OBJS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o sauerbraten $(CLIENT_OBJS) $(LIBS)
-	$(STRIP) sauerbraten
-	-$(UPX) sauerbraten
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o wclient $(CLIENT_OBJS) $(LIBS)
+	$(STRIP) wclient
+	-$(UPX) wclient
 endif
 
 ifdef LINUX
@@ -120,7 +120,7 @@ endif
 endif
 
 clean:
-	-$(RM) -r $(CLIENT_OBJS) data.zip sauer_client sauerbraten sauerbraten.exe vcpp/mingw.res
+	-$(RM) -r $(CLIENT_OBJS) data.zip sauer_client wclient sauerbraten_wc.exe vcpp/mingw.res
 
 makedepend:
 	makedepend -a -Y -Ishared -Iengine -Ifpsgame -Imod $(CLIENT_OBJS:.o=.cpp)

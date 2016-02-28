@@ -1,6 +1,6 @@
 /sauer_client
-/sauerbraten
-/sauerbraten.exe
+/wclient
+/sauerbraten_wc.exe
 data.zip
 datazip.o
 */*.o
