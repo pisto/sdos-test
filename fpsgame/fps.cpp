@@ -1256,7 +1256,7 @@ namespace game
                 break;
 
             case 8:
-                if(g->buttonf("%.25s", 0xFFFFDD, NULL, sdesc)&G3D_UP) return true;
+                if(g->buttonf((attr[0] == PROTOCOL_VERSION ? "\f2%.25s" : "%.25s"), 0xFFFFDD, NULL, sdesc)&G3D_UP) return true;
                 break;
 
             //NEW
