@@ -1251,8 +1251,8 @@ namespace game
                 int mycn = getint(p), prot = getint(p);
                 if(prot == PROTOCOL_VERSION_COLLECT)
                 {
+                    if(!collectserver) conoutf("Collect edition server, legacy mode activated");
                     collectserver = true;
-                    conoutf("Collect edition server, legacy mode activated");
                 }
                 else if(prot!=PROTOCOL_VERSION)
                 {
