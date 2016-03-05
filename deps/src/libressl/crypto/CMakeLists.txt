@@ -42,7 +42,6 @@ set(
 	asn1/a_digest.c
 	asn1/a_dup.c
 	asn1/a_enum.c
-	asn1/a_gentm.c
 	asn1/a_i2d_fp.c
 	asn1/a_int.c
 	asn1/a_mbstr.c
@@ -54,8 +53,8 @@ set(
 	asn1/a_strex.c
 	asn1/a_strnid.c
 	asn1/a_time.c
+	asn1/a_time_tm.c
 	asn1/a_type.c
-	asn1/a_utctm.c
 	asn1/a_utf8.c
 	asn1/a_verify.c
 	asn1/ameth_lib.c
@@ -263,7 +262,6 @@ set(
 	ecdh/ech_err.c
 	ecdh/ech_key.c
 	ecdh/ech_lib.c
-	ecdh/ech_ossl.c
 	ecdsa/ecs_asn1.c
 	ecdsa/ecs_err.c
 	ecdsa/ecs_lib.c
@@ -335,7 +333,6 @@ set(
 	evp/m_md5.c
 	evp/m_null.c
 	evp/m_ripemd.c
-	evp/m_sha.c
 	evp/m_sha1.c
 	evp/m_sigver.c
 	evp/m_streebog.c
@@ -473,8 +470,6 @@ set(
 	sha/sha1dgst.c
 	sha/sha256.c
 	sha/sha512.c
-	sha/sha_dgst.c
-	sha/sha_one.c
 	stack/stack.c
 	ts/ts_asn1.c
 	ts/ts_conf.c
@@ -597,6 +592,10 @@ if(NOT HAVE_STRNDUP)
 	if(NOT HAVE_STRNLEN)
 		set(CRYPTO_SRC ${CRYPTO_SRC} compat/strnlen.c)
 	endif()
+endif()
+
+if(NOT HAVE_TIMEGM)
+	set(CRYPTO_SRC ${CRYPTO_SRC} compat/timegm.c)
 endif()
 
 if(NOT HAVE_EXPLICIT_BZERO)

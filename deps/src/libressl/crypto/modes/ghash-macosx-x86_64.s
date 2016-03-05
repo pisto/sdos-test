@@ -682,9 +682,9 @@ _gcm_init_clmul:
 	pshufd	$78,%xmm2,%xmm4
 	pxor	%xmm0,%xmm3
 	pxor	%xmm2,%xmm4
-	pclmulqdq	$0,%xmm2,%xmm0
-	pclmulqdq	$17,%xmm2,%xmm1
-	pclmulqdq	$0,%xmm4,%xmm3
+.byte	102,15,58,68,194,0
+.byte	102,15,58,68,202,17
+.byte	102,15,58,68,220,0
 	pxor	%xmm0,%xmm3
 	pxor	%xmm1,%xmm3
 
@@ -726,15 +726,15 @@ _gcm_gmult_clmul:
 	movdqu	(%rdi),%xmm0
 	movdqa	L$bswap_mask(%rip),%xmm5
 	movdqu	(%rsi),%xmm2
-	pshufb	%xmm5,%xmm0
+.byte	102,15,56,0,197
 	movdqa	%xmm0,%xmm1
 	pshufd	$78,%xmm0,%xmm3
 	pshufd	$78,%xmm2,%xmm4
 	pxor	%xmm0,%xmm3
 	pxor	%xmm2,%xmm4
-	pclmulqdq	$0,%xmm2,%xmm0
-	pclmulqdq	$17,%xmm2,%xmm1
-	pclmulqdq	$0,%xmm4,%xmm3
+.byte	102,15,58,68,194,0
+.byte	102,15,58,68,202,17
+.byte	102,15,58,68,220,0
 	pxor	%xmm0,%xmm3
 	pxor	%xmm1,%xmm3
 
@@ -765,7 +765,7 @@ _gcm_gmult_clmul:
 	pxor	%xmm1,%xmm4
 	psrlq	$1,%xmm0
 	pxor	%xmm4,%xmm0
-	pshufb	%xmm5,%xmm0
+.byte	102,15,56,0,197
 	movdqu	%xmm0,(%rdi)
 	.byte	0xf3,0xc3
 
@@ -777,7 +777,7 @@ _gcm_ghash_clmul:
 
 	movdqu	(%rdi),%xmm0
 	movdqu	(%rsi),%xmm2
-	pshufb	%xmm5,%xmm0
+.byte	102,15,56,0,197
 
 	subq	$16,%rcx
 	jz	L$odd_tail
@@ -790,17 +790,17 @@ _gcm_ghash_clmul:
 
 	movdqu	(%rdx),%xmm3
 	movdqu	16(%rdx),%xmm6
-	pshufb	%xmm5,%xmm3
-	pshufb	%xmm5,%xmm6
+.byte	102,15,56,0,221
+.byte	102,15,56,0,245
 	pxor	%xmm3,%xmm0
 	movdqa	%xmm6,%xmm7
 	pshufd	$78,%xmm6,%xmm3
 	pshufd	$78,%xmm2,%xmm4
 	pxor	%xmm6,%xmm3
 	pxor	%xmm2,%xmm4
-	pclmulqdq	$0,%xmm2,%xmm6
-	pclmulqdq	$17,%xmm2,%xmm7
-	pclmulqdq	$0,%xmm4,%xmm3
+.byte	102,15,58,68,242,0
+.byte	102,15,58,68,250,17
+.byte	102,15,58,68,220,0
 	pxor	%xmm6,%xmm3
 	pxor	%xmm7,%xmm3
 
@@ -820,9 +820,9 @@ _gcm_ghash_clmul:
 	jbe	L$even_tail
 
 L$mod_loop:
-	pclmulqdq	$0,%xmm8,%xmm0
-	pclmulqdq	$17,%xmm8,%xmm1
-	pclmulqdq	$0,%xmm4,%xmm3
+.byte	102,65,15,58,68,192,0
+.byte	102,65,15,58,68,200,17
+.byte	102,15,58,68,220,0
 	pxor	%xmm0,%xmm3
 	pxor	%xmm1,%xmm3
 
@@ -836,8 +836,8 @@ L$mod_loop:
 	pxor	%xmm7,%xmm1
 
 	movdqu	16(%rdx),%xmm6
-	pshufb	%xmm5,%xmm3
-	pshufb	%xmm5,%xmm6
+.byte	102,15,56,0,221
+.byte	102,15,56,0,245
 
 	movdqa	%xmm6,%xmm7
 	pshufd	$78,%xmm6,%xmm9
@@ -851,7 +851,7 @@ L$mod_loop:
 	pxor	%xmm3,%xmm0
 	psllq	$5,%xmm0
 	pxor	%xmm3,%xmm0
-	pclmulqdq	$0,%xmm2,%xmm6
+.byte	102,15,58,68,242,0
 	psllq	$57,%xmm0
 	movdqa	%xmm0,%xmm4
 	pslldq	$8,%xmm0
@@ -859,7 +859,7 @@ L$mod_loop:
 	pxor	%xmm3,%xmm0
 	pxor	%xmm4,%xmm1
 
-	pclmulqdq	$17,%xmm2,%xmm7
+.byte	102,15,58,68,250,17
 	movdqa	%xmm0,%xmm4
 	psrlq	$5,%xmm0
 	pxor	%xmm4,%xmm0
@@ -869,7 +869,7 @@ L$mod_loop:
 	psrlq	$1,%xmm0
 	pxor	%xmm4,%xmm0
 
-	pclmulqdq	$0,%xmm10,%xmm9
+.byte	102,69,15,58,68,202,0
 	movdqa	%xmm0,%xmm1
 	pshufd	$78,%xmm0,%xmm3
 	pshufd	$78,%xmm8,%xmm4
@@ -889,9 +889,9 @@ L$mod_loop:
 	ja	L$mod_loop
 
 L$even_tail:
-	pclmulqdq	$0,%xmm8,%xmm0
-	pclmulqdq	$17,%xmm8,%xmm1
-	pclmulqdq	$0,%xmm4,%xmm3
+.byte	102,65,15,58,68,192,0
+.byte	102,65,15,58,68,200,17
+.byte	102,15,58,68,220,0
 	pxor	%xmm0,%xmm3
 	pxor	%xmm1,%xmm3
 
@@ -929,16 +929,16 @@ L$even_tail:
 
 L$odd_tail:
 	movdqu	(%rdx),%xmm3
-	pshufb	%xmm5,%xmm3
+.byte	102,15,56,0,221
 	pxor	%xmm3,%xmm0
 	movdqa	%xmm0,%xmm1
 	pshufd	$78,%xmm0,%xmm3
 	pshufd	$78,%xmm2,%xmm4
 	pxor	%xmm0,%xmm3
 	pxor	%xmm2,%xmm4
-	pclmulqdq	$0,%xmm2,%xmm0
-	pclmulqdq	$17,%xmm2,%xmm1
-	pclmulqdq	$0,%xmm4,%xmm3
+.byte	102,15,58,68,194,0
+.byte	102,15,58,68,202,17
+.byte	102,15,58,68,220,0
 	pxor	%xmm0,%xmm3
 	pxor	%xmm1,%xmm3
 
@@ -970,7 +970,7 @@ L$odd_tail:
 	psrlq	$1,%xmm0
 	pxor	%xmm4,%xmm0
 L$done:
-	pshufb	%xmm5,%xmm0
+.byte	102,15,56,0,197
 	movdqu	%xmm0,(%rdi)
 	.byte	0xf3,0xc3
 L$SEH_end_gcm_ghash_clmul:

@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_lib.c,v 1.98 2015/07/17 15:50:37 doug Exp $ */
+/* $OpenBSD: s3_lib.c,v 1.106 2015/09/12 16:10:07 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1896,36 +1896,6 @@ SSL_CIPHER ssl3_ciphers[] = {
 	/* end of list */
 };
 
-SSL3_ENC_METHOD SSLv3_enc_data = {
-	.enc = ssl3_enc,
-	.mac = n_ssl3_mac,
-	.setup_key_block = ssl3_setup_key_block,
-	.generate_master_secret = ssl3_generate_master_secret,
-	.change_cipher_state = ssl3_change_cipher_state,
-	.final_finish_mac = ssl3_final_finish_mac,
-	.finish_mac_length = MD5_DIGEST_LENGTH + SHA_DIGEST_LENGTH,
-	.cert_verify_mac = ssl3_cert_verify_mac,
-	.client_finished_label = SSL3_MD_CLIENT_FINISHED_CONST,
-	.client_finished_label_len = 4,
-	.server_finished_label = SSL3_MD_SERVER_FINISHED_CONST,
-	.server_finished_label_len = 4,
-	.alert_value = ssl3_alert_code,
-	.export_keying_material = (int (*)(SSL *, unsigned char *, size_t,
-	    const char *, size_t, const unsigned char *, size_t,
-	    int use_context))ssl_undefined_function,
-	.enc_flags = 0,
-};
-
-long
-ssl3_default_timeout(void)
-{
-	/*
-	 * 2 hours, the 24 hours mentioned in the SSLv3 spec
-	 * is way too long for http, the cache would over fill
-	 */
-	return (60 * 60 * 2);
-}
-
 int
 ssl3_num_ciphers(void)
 {
@@ -1977,22 +1947,25 @@ ssl3_pending(const SSL *s)
 	    s->s3->rrec.length : 0;
 }
 
+int
+ssl3_handshake_msg_hdr_len(SSL *s)
+{
+	return (SSL_IS_DTLS(s) ? DTLS1_HM_HEADER_LENGTH :
+            SSL3_HM_HEADER_LENGTH);
+}
+
 unsigned char *
 ssl3_handshake_msg_start(SSL *s, uint8_t msg_type)
 {
 	unsigned char *d, *p;
-	int hdr_len;
 
 	d = p = (unsigned char *)s->init_buf->data;
-
-	hdr_len = SSL_IS_DTLS(s) ? DTLS1_HM_HEADER_LENGTH :
-	    SSL3_HM_HEADER_LENGTH;
 
 	/* Handshake message type and length. */
 	*(p++) = msg_type;
 	l2n3(0, p);
 
-	return (d + hdr_len);
+	return (d + ssl3_handshake_msg_hdr_len(s));
 }
 
 void
@@ -2000,18 +1973,14 @@ ssl3_handshake_msg_finish(SSL *s, unsigned int len)
 {
 	unsigned char *d, *p;
 	uint8_t msg_type;
-	int hdr_len;
 
 	d = p = (unsigned char *)s->init_buf->data;
-
-	hdr_len = SSL_IS_DTLS(s) ? DTLS1_HM_HEADER_LENGTH :
-	    SSL3_HM_HEADER_LENGTH;
 
 	/* Handshake message length. */
 	msg_type = *(p++);
 	l2n3(len, p);
 
-	s->init_num = hdr_len + (int)len;
+	s->init_num = ssl3_handshake_msg_hdr_len(s) + (int)len;
 	s->init_off = 0;
 
 	if (SSL_IS_DTLS(s)) {
@@ -2053,7 +2022,7 @@ ssl3_free(SSL *s)
 	if (s == NULL)
 		return;
 
-	ssl3_cleanup_key_block(s);
+	tls1_cleanup_key_block(s);
 	ssl3_release_read_buffer(s);
 	ssl3_release_write_buffer(s);
 
@@ -2063,10 +2032,10 @@ ssl3_free(SSL *s)
 	if (s->s3->tmp.ca_names != NULL)
 		sk_X509_NAME_pop_free(s->s3->tmp.ca_names, X509_NAME_free);
 	BIO_free(s->s3->handshake_buffer);
-	ssl3_free_digest_list(s);
+	tls1_free_digest_list(s);
 	free(s->s3->alpn_selected);
 
-	OPENSSL_cleanse(s->s3, sizeof *s->s3);
+	explicit_bzero(s->s3, sizeof *s->s3);
 	free(s->s3);
 	s->s3 = NULL;
 }
@@ -2077,7 +2046,7 @@ ssl3_clear(SSL *s)
 	unsigned char	*rp, *wp;
 	size_t		 rlen, wlen;
 
-	ssl3_cleanup_key_block(s);
+	tls1_cleanup_key_block(s);
 	if (s->s3->tmp.ca_names != NULL)
 		sk_X509_NAME_pop_free(s->s3->tmp.ca_names, X509_NAME_free);
 
@@ -2094,7 +2063,7 @@ ssl3_clear(SSL *s)
 	BIO_free(s->s3->handshake_buffer);
 	s->s3->handshake_buffer = NULL;
 
-	ssl3_free_digest_list(s);
+	tls1_free_digest_list(s);
 
 	free(s->s3->alpn_selected);
 	s->s3->alpn_selected = NULL;
@@ -2112,7 +2081,7 @@ ssl3_clear(SSL *s)
 	s->s3->total_renegotiations = 0;
 	s->s3->num_renegotiations = 0;
 	s->s3->in_read_app_data = 0;
-	s->version = SSL3_VERSION;
+	s->version = TLS1_VERSION;
 
 	free(s->next_proto_negotiated);
 	s->next_proto_negotiated = NULL;
@@ -2171,14 +2140,6 @@ ssl3_ctrl(SSL *s, int cmd, long larg, void *parg)
 				SSLerr(SSL_F_SSL3_CTRL,
 				    ERR_R_DH_LIB);
 				return (ret);
-			}
-			if (!(s->options & SSL_OP_SINGLE_DH_USE)) {
-				if (!DH_generate_key(dh)) {
-					DH_free(dh);
-					SSLerr(SSL_F_SSL3_CTRL,
-					    ERR_R_DH_LIB);
-					return (ret);
-				}
 			}
 			DH_free(s->cert->dh_tmp);
 			s->cert->dh_tmp = dh;
@@ -2362,14 +2323,6 @@ ssl3_ctx_ctrl(SSL_CTX *ctx, int cmd, long larg, void *parg)
 				SSLerr(SSL_F_SSL3_CTX_CTRL,
 				    ERR_R_DH_LIB);
 				return 0;
-			}
-			if (!(ctx->options & SSL_OP_SINGLE_DH_USE)) {
-				if (!DH_generate_key(new)) {
-					SSLerr(SSL_F_SSL3_CTX_CTRL,
-					    ERR_R_DH_LIB);
-					DH_free(new);
-					return 0;
-				}
 			}
 			DH_free(cert->dh_tmp);
 			cert->dh_tmp = new;
@@ -2629,7 +2582,7 @@ ssl3_get_req_cert_type(SSL *s, unsigned char *p)
 	alg_k = s->s3->tmp.new_cipher->algorithm_mkey;
 
 #ifndef OPENSSL_NO_GOST
-	if ((alg_k & SSL_kGOST) && (s->version >= TLS1_VERSION)) {
+	if ((alg_k & SSL_kGOST)) {
 		p[ret++] = TLS_CT_GOST94_SIGN;
 		p[ret++] = TLS_CT_GOST01_SIGN;
 		p[ret++] = TLS_CT_GOST12_256_SIGN;
@@ -2641,13 +2594,9 @@ ssl3_get_req_cert_type(SSL *s, unsigned char *p)
 		p[ret++] = SSL3_CT_RSA_FIXED_DH;
 		p[ret++] = SSL3_CT_DSS_FIXED_DH;
 	}
-	if (s->version == SSL3_VERSION && (alg_k & SSL_kDHE)) {
-		p[ret++] = SSL3_CT_RSA_EPHEMERAL_DH;
-		p[ret++] = SSL3_CT_DSS_EPHEMERAL_DH;
-	}
 	p[ret++] = SSL3_CT_RSA_SIGN;
 	p[ret++] = SSL3_CT_DSS_SIGN;
-	if ((alg_k & (SSL_kECDHr|SSL_kECDHe)) && (s->version >= TLS1_VERSION)) {
+	if ((alg_k & (SSL_kECDHr|SSL_kECDHe))) {
 		p[ret++] = TLS_CT_RSA_FIXED_ECDH;
 		p[ret++] = TLS_CT_ECDSA_FIXED_ECDH;
 	}
@@ -2656,9 +2605,8 @@ ssl3_get_req_cert_type(SSL *s, unsigned char *p)
 	 * ECDSA certs can be used with RSA cipher suites as well
 	 * so we don't need to check for SSL_kECDH or SSL_kECDHE
 	 */
-	if (s->version >= TLS1_VERSION) {
-		p[ret++] = TLS_CT_ECDSA_SIGN;
-	}
+	p[ret++] = TLS_CT_ECDSA_SIGN;
+
 	return (ret);
 }
 

@@ -12,6 +12,7 @@
 #include <ws2tcpip.h>
 
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,6 +37,20 @@ posix_fopen(const char *path, const char *mode)
 	}
 
 	return fopen(path, mode);
+}
+
+char *
+posix_fgets(char *s, int size, FILE *stream)
+{
+	char *ret = fgets(s, size, stream);
+	if (ret != NULL) {
+		size_t end = strlen(ret);
+		if (end >= 2 && ret[end - 2] == '\r' && ret[end - 1] == '\n') {
+			ret[end - 2] = '\n';
+			ret[end - 1] = '\0';
+		}
+	}
+	return ret;
 }
 
 int

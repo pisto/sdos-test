@@ -1,4 +1,4 @@
-/* $OpenBSD: n_pkey.c,v 1.25 2015/02/11 04:00:39 jsing Exp $ */
+/* $OpenBSD: n_pkey.c,v 1.29 2015/10/16 15:12:30 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -113,8 +113,10 @@ const ASN1_ITEM NETSCAPE_ENCRYPTED_PKEY_it = {
 	.sname = "NETSCAPE_ENCRYPTED_PKEY",
 };
 
-DECLARE_ASN1_FUNCTIONS_const(NETSCAPE_ENCRYPTED_PKEY)
-DECLARE_ASN1_ENCODE_FUNCTIONS_const(NETSCAPE_ENCRYPTED_PKEY, NETSCAPE_ENCRYPTED_PKEY)
+NETSCAPE_ENCRYPTED_PKEY *NETSCAPE_ENCRYPTED_PKEY_new(void);
+void NETSCAPE_ENCRYPTED_PKEY_free(NETSCAPE_ENCRYPTED_PKEY *a);
+NETSCAPE_ENCRYPTED_PKEY *d2i_NETSCAPE_ENCRYPTED_PKEY(NETSCAPE_ENCRYPTED_PKEY **a, const unsigned char **in, long len);
+int i2d_NETSCAPE_ENCRYPTED_PKEY(const NETSCAPE_ENCRYPTED_PKEY *a, unsigned char **out);
 
 NETSCAPE_ENCRYPTED_PKEY *
 d2i_NETSCAPE_ENCRYPTED_PKEY(NETSCAPE_ENCRYPTED_PKEY **a, const unsigned char **in, long len)
@@ -168,8 +170,10 @@ const ASN1_ITEM NETSCAPE_PKEY_it = {
 	.sname = "NETSCAPE_PKEY",
 };
 
-DECLARE_ASN1_FUNCTIONS_const(NETSCAPE_PKEY)
-DECLARE_ASN1_ENCODE_FUNCTIONS_const(NETSCAPE_PKEY, NETSCAPE_PKEY)
+NETSCAPE_PKEY *NETSCAPE_PKEY_new(void);
+void NETSCAPE_PKEY_free(NETSCAPE_PKEY *a);
+NETSCAPE_PKEY *d2i_NETSCAPE_PKEY(NETSCAPE_PKEY **a, const unsigned char **in, long len);
+int i2d_NETSCAPE_PKEY(const NETSCAPE_PKEY *a, unsigned char **out);
 
 NETSCAPE_PKEY *
 d2i_NETSCAPE_PKEY(NETSCAPE_PKEY **a, const unsigned char **in, long len)
@@ -277,7 +281,7 @@ i2d_RSA_NET(const RSA *a, unsigned char **pp,
 	i2d_NETSCAPE_PKEY(pkey, &zz);
 
 	/* Wipe the private key encoding */
-	OPENSSL_cleanse(pkey->private_key->data, rsalen);
+	explicit_bzero(pkey->private_key->data, rsalen);
 
 	if (cb == NULL)
 		cb = EVP_read_pw_string;
@@ -297,7 +301,7 @@ i2d_RSA_NET(const RSA *a, unsigned char **pp,
 
 	if (!EVP_BytesToKey(EVP_rc4(), EVP_md5(), NULL, buf, i,1, key, NULL))
 		goto err;
-	OPENSSL_cleanse(buf, sizeof(buf));
+	explicit_bzero(buf, sizeof(buf));
 
 	/* Encrypt private key in place */
 	zz = enckey->enckey->digest->data;
@@ -394,7 +398,7 @@ d2i_RSA_NET_2(RSA **a, ASN1_OCTET_STRING *os,
 
 	if (!EVP_BytesToKey(EVP_rc4(), EVP_md5(), NULL, buf, i,1, key, NULL))
 		goto err;
-	OPENSSL_cleanse(buf, sizeof(buf));
+	explicit_bzero(buf, sizeof(buf));
 
 	if (!EVP_DecryptInit_ex(&ctx, EVP_rc4(), NULL, key, NULL))
 		goto err;

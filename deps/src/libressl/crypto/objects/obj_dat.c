@@ -1,4 +1,4 @@
-/* $OpenBSD: obj_dat.c,v 1.31 2014/08/08 04:53:43 guenther Exp $ */
+/* $OpenBSD: obj_dat.c,v 1.34 2015/10/14 21:25:16 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -565,6 +565,10 @@ OBJ_obj2txt(char *buf, int buf_len, const ASN1_OBJECT *a, int no_name)
 			ret++;
 		}
 
+		if (buf_len <= 0) {
+			ret = 0;
+			goto out;
+		}
 		if (use_bn) {
 			char *bndec;
 

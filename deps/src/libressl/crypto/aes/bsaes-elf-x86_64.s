@@ -13,20 +13,20 @@ _bsaes_encrypt8:
 	movdqa	80(%r11),%xmm7
 	pxor	%xmm8,%xmm15
 	pxor	%xmm8,%xmm0
-	pshufb	%xmm7,%xmm15
+.byte	102,68,15,56,0,255
 	pxor	%xmm8,%xmm1
-	pshufb	%xmm7,%xmm0
+.byte	102,15,56,0,199
 	pxor	%xmm8,%xmm2
-	pshufb	%xmm7,%xmm1
+.byte	102,15,56,0,207
 	pxor	%xmm8,%xmm3
-	pshufb	%xmm7,%xmm2
+.byte	102,15,56,0,215
 	pxor	%xmm8,%xmm4
-	pshufb	%xmm7,%xmm3
+.byte	102,15,56,0,223
 	pxor	%xmm8,%xmm5
-	pshufb	%xmm7,%xmm4
+.byte	102,15,56,0,231
 	pxor	%xmm8,%xmm6
-	pshufb	%xmm7,%xmm5
-	pshufb	%xmm7,%xmm6
+.byte	102,15,56,0,239
+.byte	102,15,56,0,247
 _bsaes_encrypt8_bitslice:
 	movdqa	0(%r11),%xmm7
 	movdqa	16(%r11),%xmm8
@@ -121,21 +121,21 @@ _bsaes_encrypt8_bitslice:
 .Lenc_loop:
 	pxor	0(%rax),%xmm15
 	pxor	16(%rax),%xmm0
-	pshufb	%xmm7,%xmm15
+.byte	102,68,15,56,0,255
 	pxor	32(%rax),%xmm1
-	pshufb	%xmm7,%xmm0
+.byte	102,15,56,0,199
 	pxor	48(%rax),%xmm2
-	pshufb	%xmm7,%xmm1
+.byte	102,15,56,0,207
 	pxor	64(%rax),%xmm3
-	pshufb	%xmm7,%xmm2
+.byte	102,15,56,0,215
 	pxor	80(%rax),%xmm4
-	pshufb	%xmm7,%xmm3
+.byte	102,15,56,0,223
 	pxor	96(%rax),%xmm5
-	pshufb	%xmm7,%xmm4
+.byte	102,15,56,0,231
 	pxor	112(%rax),%xmm6
-	pshufb	%xmm7,%xmm5
+.byte	102,15,56,0,239
 	leaq	128(%rax),%rax
-	pshufb	%xmm7,%xmm6
+.byte	102,15,56,0,247
 .Lenc_sbox:
 	pxor	%xmm5,%xmm4
 	pxor	%xmm0,%xmm1
@@ -485,20 +485,20 @@ _bsaes_decrypt8:
 	movdqa	-48(%r11),%xmm7
 	pxor	%xmm8,%xmm15
 	pxor	%xmm8,%xmm0
-	pshufb	%xmm7,%xmm15
+.byte	102,68,15,56,0,255
 	pxor	%xmm8,%xmm1
-	pshufb	%xmm7,%xmm0
+.byte	102,15,56,0,199
 	pxor	%xmm8,%xmm2
-	pshufb	%xmm7,%xmm1
+.byte	102,15,56,0,207
 	pxor	%xmm8,%xmm3
-	pshufb	%xmm7,%xmm2
+.byte	102,15,56,0,215
 	pxor	%xmm8,%xmm4
-	pshufb	%xmm7,%xmm3
+.byte	102,15,56,0,223
 	pxor	%xmm8,%xmm5
-	pshufb	%xmm7,%xmm4
+.byte	102,15,56,0,231
 	pxor	%xmm8,%xmm6
-	pshufb	%xmm7,%xmm5
-	pshufb	%xmm7,%xmm6
+.byte	102,15,56,0,239
+.byte	102,15,56,0,247
 	movdqa	0(%r11),%xmm7
 	movdqa	16(%r11),%xmm8
 	movdqa	%xmm5,%xmm9
@@ -592,21 +592,21 @@ _bsaes_decrypt8:
 .Ldec_loop:
 	pxor	0(%rax),%xmm15
 	pxor	16(%rax),%xmm0
-	pshufb	%xmm7,%xmm15
+.byte	102,68,15,56,0,255
 	pxor	32(%rax),%xmm1
-	pshufb	%xmm7,%xmm0
+.byte	102,15,56,0,199
 	pxor	48(%rax),%xmm2
-	pshufb	%xmm7,%xmm1
+.byte	102,15,56,0,207
 	pxor	64(%rax),%xmm3
-	pshufb	%xmm7,%xmm2
+.byte	102,15,56,0,215
 	pxor	80(%rax),%xmm4
-	pshufb	%xmm7,%xmm3
+.byte	102,15,56,0,223
 	pxor	96(%rax),%xmm5
-	pshufb	%xmm7,%xmm4
+.byte	102,15,56,0,231
 	pxor	112(%rax),%xmm6
-	pshufb	%xmm7,%xmm5
+.byte	102,15,56,0,239
 	leaq	128(%rax),%rax
-	pshufb	%xmm7,%xmm6
+.byte	102,15,56,0,247
 .Ldec_sbox:
 	pxor	%xmm3,%xmm2
 
@@ -1000,7 +1000,7 @@ _bsaes_key_convert:
 	jmp	.Lkey_loop
 .align	16
 .Lkey_loop:
-	pshufb	%xmm4,%xmm6
+.byte	102,15,56,0,244
 
 	movdqa	%xmm0,%xmm8
 	movdqa	%xmm1,%xmm9
@@ -1353,8 +1353,8 @@ bsaes_ctr32_encrypt_blocks:
 	leaq	.LADD1(%rip),%r11
 	movdqa	32(%rbp),%xmm15
 	movdqa	-32(%r11),%xmm7
-	pshufb	%xmm7,%xmm8
-	pshufb	%xmm7,%xmm15
+.byte	102,68,15,56,0,199
+.byte	102,68,15,56,0,255
 	movdqa	%xmm8,(%rsp)
 	jmp	.Lctr_enc_loop
 .align	16
@@ -1382,21 +1382,21 @@ bsaes_ctr32_encrypt_blocks:
 	movdqa	-16(%r11),%xmm7
 	pxor	%xmm8,%xmm15
 	pxor	%xmm8,%xmm0
-	pshufb	%xmm7,%xmm15
+.byte	102,68,15,56,0,255
 	pxor	%xmm8,%xmm1
-	pshufb	%xmm7,%xmm0
+.byte	102,15,56,0,199
 	pxor	%xmm8,%xmm2
-	pshufb	%xmm7,%xmm1
+.byte	102,15,56,0,207
 	pxor	%xmm8,%xmm3
-	pshufb	%xmm7,%xmm2
+.byte	102,15,56,0,215
 	pxor	%xmm8,%xmm4
-	pshufb	%xmm7,%xmm3
+.byte	102,15,56,0,223
 	pxor	%xmm8,%xmm5
-	pshufb	%xmm7,%xmm4
+.byte	102,15,56,0,231
 	pxor	%xmm8,%xmm6
-	pshufb	%xmm7,%xmm5
+.byte	102,15,56,0,239
 	leaq	.LBS0(%rip),%r11
-	pshufb	%xmm7,%xmm6
+.byte	102,15,56,0,247
 	movl	%ebx,%r10d
 
 	call	_bsaes_encrypt8_bitslice

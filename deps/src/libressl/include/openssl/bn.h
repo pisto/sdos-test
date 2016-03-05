@@ -1,4 +1,4 @@
-/* $OpenBSD: bn.h,v 1.25 2014/10/22 13:02:04 jsing Exp $ */
+/* $OpenBSD: bn.h,v 1.27 2015/10/16 12:41:29 beck Exp $ */
 /* Copyright (C) 1995-1997 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -132,6 +132,7 @@
 
 #include <openssl/ossl_typ.h>
 #include <openssl/crypto.h>
+#include <openssl/bio.h>
 
 #ifdef  __cplusplus
 extern "C" {
@@ -433,11 +434,7 @@ int	BN_mod_exp_simple(BIGNUM *r, const BIGNUM *a, const BIGNUM *p,
 
 int	BN_mask_bits(BIGNUM *a, int n);
 int	BN_print_fp(FILE *fp, const BIGNUM *a);
-#ifdef HEADER_BIO_H
 int	BN_print(BIO *fp, const BIGNUM *a);
-#else
-int	BN_print(void *fp, const BIGNUM *a);
-#endif
 int	BN_reciprocal(BIGNUM *r, const BIGNUM *m, int len, BN_CTX *ctx);
 int	BN_rshift(BIGNUM *r, const BIGNUM *a, int n);
 int	BN_rshift1(BIGNUM *r, const BIGNUM *a);
@@ -771,6 +768,7 @@ void ERR_load_BN_strings(void);
 #define BN_F_BN_DIV_RECP				 130
 #define BN_F_BN_EXP					 123
 #define BN_F_BN_EXPAND2					 108
+#define BN_F_BN_GENERATE_PRIME_EX			 140
 #define BN_F_BN_EXPAND_INTERNAL				 120
 #define BN_F_BN_GF2M_MOD				 131
 #define BN_F_BN_GF2M_MOD_EXP				 132
@@ -800,6 +798,7 @@ void ERR_load_BN_strings(void);
 #define BN_R_ARG2_LT_ARG3				 100
 #define BN_R_BAD_RECIPROCAL				 101
 #define BN_R_BIGNUM_TOO_LONG				 114
+#define BN_R_BITS_TOO_SMALL				 117
 #define BN_R_CALLED_WITH_EVEN_MODULUS			 102
 #define BN_R_DIV_BY_ZERO				 103
 #define BN_R_ENCODING_ERROR				 104

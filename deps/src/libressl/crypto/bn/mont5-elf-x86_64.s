@@ -54,7 +54,7 @@ bn_mul_mont_gather5:
 	leaq	256(%r12),%r12
 	por	%xmm3,%xmm0
 
-	movq	%xmm0,%rbx
+	movd	%xmm0,%rbx
 
 	movq	(%r8),%r8
 	movq	(%rsi),%rax
@@ -117,7 +117,7 @@ bn_mul_mont_gather5:
 	cmpq	%r9,%r15
 	jl	.L1st
 
-	movq	%xmm0,%rbx
+	movd	%xmm0,%rbx
 
 	addq	%rax,%r13
 	movq	(%rsi),%rax
@@ -200,7 +200,7 @@ bn_mul_mont_gather5:
 	cmpq	%r9,%r15
 	jl	.Linner
 
-	movq	%xmm0,%rbx
+	movd	%xmm0,%rbx
 
 	addq	%rax,%r13
 	movq	(%rsi),%rax
@@ -312,7 +312,7 @@ bn_mul4x_mont_gather5:
 	leaq	256(%r12),%r12
 	por	%xmm3,%xmm0
 
-	movq	%xmm0,%rbx
+	movd	%xmm0,%rbx
 	movq	(%r8),%r8
 	movq	(%rsi),%rax
 
@@ -459,7 +459,7 @@ bn_mul4x_mont_gather5:
 	movq	%rdi,-16(%rsp,%r15,8)
 	movq	%rdx,%r13
 
-	movq	%xmm0,%rbx
+	movd	%xmm0,%rbx
 
 	xorq	%rdi,%rdi
 	addq	%r10,%r13
@@ -627,7 +627,7 @@ bn_mul4x_mont_gather5:
 	movq	%r13,-24(%rsp,%r15,8)
 	movq	%rdx,%r13
 
-	movq	%xmm0,%rbx
+	movd	%xmm0,%rbx
 	movq	%rdi,-16(%rsp,%r15,8)
 
 	xorq	%rdi,%rdi

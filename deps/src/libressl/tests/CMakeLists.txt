@@ -5,7 +5,8 @@ include_directories(
 	../crypto/modes
 	../crypto/asn1
 	../ssl
-	../apps
+	../apps/openssl
+	../apps/openssl/compat
 )
 
 set(ENV{srcdir} ${CMAKE_CURRENT_SOURCE_DIR})
@@ -34,6 +35,11 @@ endif()
 add_executable(asn1test asn1test.c)
 target_link_libraries(asn1test ${OPENSSL_LIBS})
 add_test(asn1test asn1test)
+
+# asn1time
+add_executable(asn1time asn1time.c)
+target_link_libraries(asn1time ${OPENSSL_LIBS})
+add_test(asn1time asn1time)
 
 # base64test
 add_executable(base64test base64test.c)
@@ -74,6 +80,11 @@ add_test(cipher_list cipher_list)
 add_executable(cipherstest cipherstest.c)
 target_link_libraries(cipherstest ${OPENSSL_LIBS})
 add_test(cipherstest cipherstest)
+
+# clienttest
+add_executable(clienttest clienttest.c)
+target_link_libraries(clienttest ${OPENSSL_LIBS})
+add_test(clienttest clienttest)
 
 # cts128test
 add_executable(cts128test cts128test.c)
@@ -216,6 +227,11 @@ add_executable(rc4test rc4test.c)
 target_link_libraries(rc4test ${OPENSSL_LIBS})
 add_test(rc4test rc4test)
 
+# rfc5280time
+add_executable(rfc5280time rfc5280time.c)
+target_link_libraries(rfc5280time ${OPENSSL_LIBS})
+add_test(rfc5280time rfc5280time)
+
 # rmdtest
 add_executable(rmdtest rmdtest.c)
 target_link_libraries(rmdtest ${OPENSSL_LIBS})
@@ -235,11 +251,6 @@ add_test(sha256test sha256test)
 add_executable(sha512test sha512test.c)
 target_link_libraries(sha512test ${OPENSSL_LIBS})
 add_test(sha512test sha512test)
-
-# shatest
-add_executable(shatest shatest.c)
-target_link_libraries(shatest ${OPENSSL_LIBS})
-add_test(shatest shatest)
 
 # ssltest
 #add_executable(ssltest ssltest.c)
@@ -264,3 +275,8 @@ add_test(timingsafe timingsafe)
 add_executable(utf8test utf8test.c)
 target_link_libraries(utf8test ${OPENSSL_LIBS})
 add_test(utf8test utf8test)
+
+# verifytest
+add_executable(verifytest verifytest.c)
+target_link_libraries(verifytest tls ${OPENSSL_LIBS})
+add_test(verifytest verifytest)

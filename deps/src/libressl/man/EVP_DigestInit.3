@@ -133,7 +133,7 @@
 .\" ========================================================================
 .\"
 .IX Title "EVP_DigestInit 3"
-.TH EVP_DigestInit 3 "2015-12-05" "LibreSSL " "LibreSSL"
+.TH EVP_DigestInit 3 "2016-01-27" "LibreSSL " "LibreSSL"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -143,10 +143,10 @@ EVP_MD_CTX_init, EVP_MD_CTX_create, EVP_DigestInit_ex, EVP_DigestUpdate,
 EVP_DigestFinal_ex, EVP_MD_CTX_cleanup, EVP_MD_CTX_destroy, EVP_MAX_MD_SIZE,
 EVP_MD_CTX_copy_ex, EVP_MD_CTX_copy, EVP_MD_type, EVP_MD_pkey_type,
 EVP_MD_size, EVP_MD_block_size, EVP_MD_CTX_md, EVP_MD_CTX_size,
-EVP_MD_CTX_block_size, EVP_MD_CTX_type, EVP_md_null, EVP_md2, EVP_md5, EVP_sha,
+EVP_MD_CTX_block_size, EVP_MD_CTX_type, EVP_md_null, EVP_md2, EVP_md5,
 EVP_sha1, EVP_sha224, EVP_sha256, EVP_sha384, EVP_sha512, EVP_dss, EVP_dss1,
 EVP_ripemd160, EVP_get_digestbyname, EVP_get_digestbynid,
-EVP_get_digestbyobj \- EVP digest routines
+EVP_get_digestbyobj, EVP_DigestInit, EVP_DigestFinal \- EVP digest routines
 .SH "SYNOPSIS"
 .IX Header "SYNOPSIS"
 .Vb 1
@@ -186,7 +186,6 @@ EVP_get_digestbyobj \- EVP digest routines
 \& const EVP_MD *EVP_md_null(void);
 \& const EVP_MD *EVP_md2(void);
 \& const EVP_MD *EVP_md5(void);
-\& const EVP_MD *EVP_sha(void);
 \& const EVP_MD *EVP_sha1(void);
 \& const EVP_MD *EVP_dss(void);
 \& const EVP_MD *EVP_dss1(void);
@@ -269,12 +268,12 @@ this will return \fBNID_sha1WithRSAEncryption\fR. Since digests and signature
 algorithms are no longer linked this function is only retained for
 compatibility reasons.
 .PP
-\&\fIEVP_md2()\fR, \fIEVP_md5()\fR, \fIEVP_sha()\fR, \fIEVP_sha1()\fR, \fIEVP_sha224()\fR, \fIEVP_sha256()\fR,
-\&\fIEVP_sha384()\fR, \fIEVP_sha512()\fR and \fIEVP_ripemd160()\fR return \fB\s-1EVP_MD\s0\fR
-structures for the \s-1MD2, MD5, SHA, SHA1, SHA224, SHA256, SHA384, SHA512\s0
-and \s-1RIPEMD160\s0 digest algorithms respectively.
+\&\fIEVP_md2()\fR, \fIEVP_md5()\fR, \fIEVP_sha1()\fR, \fIEVP_sha224()\fR, \fIEVP_sha256()\fR, \fIEVP_sha384()\fR,
+\&\fIEVP_sha512()\fR and \fIEVP_ripemd160()\fR return \fB\s-1EVP_MD\s0\fR structures for the \s-1MD2, MD5,
+SHA1, SHA224, SHA256, SHA384, SHA512\s0 and \s-1RIPEMD160\s0 digest algorithms
+respectively.
 .PP
-\&\fIEVP_dss()\fR and \fIEVP_dss1()\fR return \fB\s-1EVP_MD\s0\fR structures for \s-1SHA\s0 and \s-1SHA1\s0 digest
+\&\fIEVP_dss()\fR and \fIEVP_dss1()\fR return \fB\s-1EVP_MD\s0\fR structures for \s-1SHA1\s0 digest
 algorithms but using \s-1DSS \s0(\s-1DSA\s0) for the signature algorithm. Note: there is
 no need to use these pseudo-digests in OpenSSL 1.0.0 and later, they are
 however retained for compatibility.
@@ -299,7 +298,7 @@ corresponding \s-1OBJECT IDENTIFIER\s0 or NID_undef if none exists.
 \&\fIEVP_MD_size()\fR, \fIEVP_MD_block_size()\fR, \fIEVP_MD_CTX_size()\fR and
 \&\fIEVP_MD_CTX_block_size()\fR return the digest or block size in bytes.
 .PP
-\&\fIEVP_md_null()\fR, \fIEVP_md2()\fR, \fIEVP_md5()\fR, \fIEVP_sha()\fR, \fIEVP_sha1()\fR, \fIEVP_dss()\fR,
+\&\fIEVP_md_null()\fR, \fIEVP_md2()\fR, \fIEVP_md5()\fR, \fIEVP_sha1()\fR, \fIEVP_dss()\fR,
 \&\fIEVP_dss1()\fR and \fIEVP_ripemd160()\fR return pointers to the
 corresponding \s-1EVP_MD\s0 structures.
 .PP
@@ -401,7 +400,7 @@ available in all versions of SSLeay and OpenSSL.
 \&\fIEVP_MD_CTX_cleanup()\fR, \fIEVP_MD_CTX_destroy()\fR, \fIEVP_DigestInit_ex()\fR
 and \fIEVP_DigestFinal_ex()\fR were added in OpenSSL 0.9.7.
 .PP
-\&\fIEVP_md_null()\fR, \fIEVP_md2()\fR, \fIEVP_md5()\fR, \fIEVP_sha()\fR, \fIEVP_sha1()\fR,
+\&\fIEVP_md_null()\fR, \fIEVP_md2()\fR, \fIEVP_md5()\fR, \fIEVP_sha1()\fR,
 \&\fIEVP_dss()\fR, \fIEVP_dss1()\fR and \fIEVP_ripemd160()\fR were
 changed to return truely const \s-1EVP_MD\s0 * in OpenSSL 0.9.7.
 .PP

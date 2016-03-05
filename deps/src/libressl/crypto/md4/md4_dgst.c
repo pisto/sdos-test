@@ -1,4 +1,4 @@
-/* $OpenBSD: md4_dgst.c,v 1.13 2014/08/18 19:11:48 bcook Exp $ */
+/* $OpenBSD$ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *

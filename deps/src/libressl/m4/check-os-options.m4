@@ -1,10 +1,10 @@
-# This must be called before AC_PROG_CC
 AC_DEFUN([CHECK_OS_OPTIONS], [
 
 CFLAGS="$CFLAGS -Wall -std=gnu99 -fno-strict-aliasing"
 
 case $host_os in
 	*aix*)
+		BUILD_NC=yes
 		HOST_OS=aix
 		if test "`echo $CC | cut -d ' ' -f 1`" != "gcc" ; then
 			CFLAGS="-qnoansialias $USER_CFLAGS"
@@ -12,13 +12,22 @@ case $host_os in
 		AC_SUBST([PLATFORM_LDADD], ['-lperfstat -lpthread'])
 		;;
 	*cygwin*)
+		BUILD_NC=yes
 		HOST_OS=cygwin
 		;;
 	*darwin*)
+		BUILD_NC=yes
+                # weak seed on failure to open /dev/random, based on latest public source
+                # http://www.opensource.apple.com/source/Libc/Libc-997.90.3/gen/FreeBSD/arc4random.c
+                USE_BUILTIN_ARC4RANDOM=yes
 		HOST_OS=darwin
 		HOST_ABI=macosx
 		;;
 	*freebsd*)
+		BUILD_NC=yes
+                # fork detection missing, weak seed on failure
+                # https://svnweb.freebsd.org/base/head/lib/libc/gen/arc4random.c?revision=268642&view=markup
+                USE_BUILTIN_ARC4RANDOM=yes
 		HOST_OS=freebsd
 		HOST_ABI=elf
 		AC_SUBST([PROG_LDADD], ['-lthr'])
@@ -34,15 +43,29 @@ case $host_os in
 		AC_SUBST([PLATFORM_LDADD], ['-lpthread'])
 		;;
 	*linux*)
+		BUILD_NC=yes
 		HOST_OS=linux
 		HOST_ABI=elf
 		CPPFLAGS="$CPPFLAGS -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_SOURCE -D_GNU_SOURCE"
 		;;
 	*netbsd*)
+		BUILD_NC=yes
+               AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <sys/param.h>
+#if __NetBSD_Version__ < 700000001
+        undefined
+#endif
+                       ]], [[]])],
+                       [ USE_BUILTIN_ARC4RANDOM=no ],
+                       [ USE_BUILTIN_ARC4RANDOM=yes ]
+               )
+
 		HOST_OS=netbsd
 		CPPFLAGS="$CPPFLAGS -D_OPENBSD_SOURCE"
 		;;
 	*openbsd* | *bitrig*)
+		BUILD_NC=yes
+		HOST_OS=openbsd
 		HOST_ABI=elf
 		AC_DEFINE([HAVE_ATTRIBUTE__BOUNDED__], [1], [OpenBSD gcc has bounded])
 		;;
@@ -57,6 +80,7 @@ case $host_os in
 		AC_SUBST([PLATFORM_LDADD], ['-lws2_32'])
 		;;
 	*solaris*)
+		BUILD_NC=yes
 		HOST_OS=solaris
 		HOST_ABI=elf
 		CPPFLAGS="$CPPFLAGS -D__EXTENSIONS__ -D_XOPEN_SOURCE=600 -DBSD_COMP"
@@ -65,6 +89,11 @@ case $host_os in
 	*) ;;
 esac
 
+AC_ARG_ENABLE([nc],
+	AS_HELP_STRING([--enable-nc], [Enable installing TLS-enabled nc(1)]))
+AM_CONDITIONAL([ENABLE_NC], [test "x$enable_nc" = xyes])
+AM_CONDITIONAL([BUILD_NC],  [test x$BUILD_NC = xyes -o "x$enable_nc" = xyes])
+
 AM_CONDITIONAL([HOST_AIX],     [test x$HOST_OS = xaix])
 AM_CONDITIONAL([HOST_CYGWIN],  [test x$HOST_OS = xcygwin])
 AM_CONDITIONAL([HOST_DARWIN],  [test x$HOST_OS = xdarwin])
@@ -72,6 +101,7 @@ AM_CONDITIONAL([HOST_FREEBSD], [test x$HOST_OS = xfreebsd])
 AM_CONDITIONAL([HOST_HPUX],    [test x$HOST_OS = xhpux])
 AM_CONDITIONAL([HOST_LINUX],   [test x$HOST_OS = xlinux])
 AM_CONDITIONAL([HOST_NETBSD],  [test x$HOST_OS = xnetbsd])
+AM_CONDITIONAL([HOST_OPENBSD], [test x$HOST_OS = xopenbsd])
 AM_CONDITIONAL([HOST_SOLARIS], [test x$HOST_OS = xsolaris])
 AM_CONDITIONAL([HOST_WIN],     [test x$HOST_OS = xwin])
 ])

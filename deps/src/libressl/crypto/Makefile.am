@@ -13,7 +13,10 @@ EXTRA_DIST += CMakeLists.txt
 EXTRA_DIST += compat/strcasecmp.c
 
 libcrypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined
-libcrypto_la_LIBADD = libcompat.la libcompatnoopt.la
+libcrypto_la_LIBADD = libcompat.la
+if !HAVE_EXPLICIT_BZERO
+libcrypto_la_LIBADD += libcompatnoopt.la
+endif
 libcrypto_la_CPPFLAGS = $(AM_CPPFLAGS)
 libcrypto_la_CPPFLAGS += -DLIBRESSL_INTERNAL
 libcrypto_la_CPPFLAGS += -DOPENSSL_NO_HW_PADLOCK
@@ -31,13 +34,15 @@ else
 libcrypto_la_CPPFLAGS += -DOPENSSLDIR=\"$(sysconfdir)/ssl\"
 endif
 
-noinst_LTLIBRARIES = libcompat.la libcompatnoopt.la
+noinst_LTLIBRARIES = libcompat.la
 
 # compatibility functions that need to be built without optimizations
+if !HAVE_EXPLICIT_BZERO
+noinst_LTLIBRARIES += libcompatnoopt.la
+
 libcompatnoopt_la_CFLAGS = -O0
 libcompatnoopt_la_SOURCES =
 
-if !HAVE_EXPLICIT_BZERO
 if HOST_WIN
 libcompatnoopt_la_SOURCES += compat/explicit_bzero_win.c
 else
@@ -71,6 +76,10 @@ endif
 
 if !HAVE_INET_PTON
 libcompat_la_SOURCES += compat/inet_pton.c
+endif
+
+if !HAVE_TIMEGM
+libcompat_la_SOURCES += compat/timegm.c
 endif
 
 if !HAVE_REALLOCARRAY
@@ -141,7 +150,6 @@ libcrypto_la_SOURCES += asn1/a_d2i_fp.c
 libcrypto_la_SOURCES += asn1/a_digest.c
 libcrypto_la_SOURCES += asn1/a_dup.c
 libcrypto_la_SOURCES += asn1/a_enum.c
-libcrypto_la_SOURCES += asn1/a_gentm.c
 libcrypto_la_SOURCES += asn1/a_i2d_fp.c
 libcrypto_la_SOURCES += asn1/a_int.c
 libcrypto_la_SOURCES += asn1/a_mbstr.c
@@ -153,8 +161,8 @@ libcrypto_la_SOURCES += asn1/a_sign.c
 libcrypto_la_SOURCES += asn1/a_strex.c
 libcrypto_la_SOURCES += asn1/a_strnid.c
 libcrypto_la_SOURCES += asn1/a_time.c
+libcrypto_la_SOURCES += asn1/a_time_tm.c
 libcrypto_la_SOURCES += asn1/a_type.c
-libcrypto_la_SOURCES += asn1/a_utctm.c
 libcrypto_la_SOURCES += asn1/a_utf8.c
 libcrypto_la_SOURCES += asn1/a_verify.c
 libcrypto_la_SOURCES += asn1/ameth_lib.c
@@ -420,7 +428,6 @@ noinst_HEADERS += ec/ec_lcl.h
 libcrypto_la_SOURCES += ecdh/ech_err.c
 libcrypto_la_SOURCES += ecdh/ech_key.c
 libcrypto_la_SOURCES += ecdh/ech_lib.c
-libcrypto_la_SOURCES += ecdh/ech_ossl.c
 noinst_HEADERS += ecdh/ech_locl.h
 
 # ecdsa
@@ -503,7 +510,6 @@ libcrypto_la_SOURCES += evp/m_md4.c
 libcrypto_la_SOURCES += evp/m_md5.c
 libcrypto_la_SOURCES += evp/m_null.c
 libcrypto_la_SOURCES += evp/m_ripemd.c
-libcrypto_la_SOURCES += evp/m_sha.c
 libcrypto_la_SOURCES += evp/m_sha1.c
 libcrypto_la_SOURCES += evp/m_sigver.c
 libcrypto_la_SOURCES += evp/m_streebog.c
@@ -697,8 +703,6 @@ libcrypto_la_SOURCES += sha/sha1_one.c
 libcrypto_la_SOURCES += sha/sha1dgst.c
 libcrypto_la_SOURCES += sha/sha256.c
 libcrypto_la_SOURCES += sha/sha512.c
-libcrypto_la_SOURCES += sha/sha_dgst.c
-libcrypto_la_SOURCES += sha/sha_one.c
 noinst_HEADERS += sha/sha_locl.h
 
 # stack

@@ -676,6 +676,10 @@ asn1_d2i_ex_primitive(ASN1_VALUE **pval, const unsigned char **in, long inlen,
 	const unsigned char *cont = NULL;
 	long len;
 
+	buf.length = 0;
+	buf.max = 0;
+	buf.data = NULL;
+
 	if (!pval) {
 		ASN1err(ASN1_F_ASN1_D2I_EX_PRIMITIVE, ASN1_R_ILLEGAL_NULL);
 		return 0; /* Should never happen */
@@ -753,9 +757,6 @@ asn1_d2i_ex_primitive(ASN1_VALUE **pval, const unsigned char **in, long inlen,
 			buf.data = NULL;
 		}
 	} else if (cst) {
-		buf.length = 0;
-		buf.max = 0;
-		buf.data = NULL;
 		/* Should really check the internal tags are correct but
 		 * some things may get this wrong. The relevant specs
 		 * say that constructed string types should be OCTET STRINGs

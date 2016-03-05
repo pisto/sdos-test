@@ -51,11 +51,11 @@ aesni_cbc_sha1_enc_ssse3:
 	movdqu	16(%r10),%xmm1
 	movdqu	32(%r10),%xmm2
 	movdqu	48(%r10),%xmm3
-	pshufb	%xmm6,%xmm0
+.byte	102,15,56,0,198
 	addq	$64,%r10
-	pshufb	%xmm6,%xmm1
-	pshufb	%xmm6,%xmm2
-	pshufb	%xmm6,%xmm3
+.byte	102,15,56,0,206
+.byte	102,15,56,0,214
+.byte	102,15,56,0,222
 	paddd	%xmm9,%xmm0
 	paddd	%xmm9,%xmm1
 	paddd	%xmm9,%xmm2
@@ -79,7 +79,7 @@ L$oop_ssse3:
 	movups	32(%r15),%xmm15
 	xorl	%edx,%ecx
 	movdqa	%xmm3,%xmm8
-	palignr	$8,%xmm0,%xmm4
+.byte	102,15,58,15,224,8
 	movl	%eax,%edi
 	roll	$5,%eax
 	paddd	%xmm3,%xmm9
@@ -144,7 +144,7 @@ L$oop_ssse3:
 	addl	16(%rsp),%eax
 	xorl	%ebp,%edx
 	movdqa	%xmm4,%xmm9
-	palignr	$8,%xmm1,%xmm5
+.byte	102,15,58,15,233,8
 	movl	%ebx,%edi
 	roll	$5,%ebx
 	paddd	%xmm4,%xmm10
@@ -209,7 +209,7 @@ L$oop_ssse3:
 	addl	32(%rsp),%ebx
 	xorl	%eax,%ebp
 	movdqa	%xmm5,%xmm10
-	palignr	$8,%xmm2,%xmm6
+.byte	102,15,58,15,242,8
 	movl	%ecx,%edi
 	roll	$5,%ecx
 	aesenc	%xmm15,%xmm11
@@ -276,7 +276,7 @@ L$oop_ssse3:
 	addl	48(%rsp),%ecx
 	xorl	%ebx,%eax
 	movdqa	%xmm6,%xmm8
-	palignr	$8,%xmm3,%xmm7
+.byte	102,15,58,15,251,8
 	movl	%edx,%edi
 	roll	$5,%edx
 	paddd	%xmm6,%xmm9
@@ -352,7 +352,7 @@ L$aesenclast1:
 	movdqa	%xmm7,%xmm9
 	addl	0(%rsp),%edx
 	pxor	%xmm4,%xmm0
-	palignr	$8,%xmm6,%xmm9
+.byte	102,68,15,58,15,206,8
 	xorl	%ecx,%ebx
 	movl	%ebp,%edi
 	roll	$5,%ebp
@@ -414,7 +414,7 @@ L$aesenclast1:
 	aesenc	%xmm14,%xmm11
 	movups	64(%r15),%xmm15
 	pxor	%xmm5,%xmm1
-	palignr	$8,%xmm7,%xmm10
+.byte	102,68,15,58,15,215,8
 	xorl	%edx,%esi
 	movl	%eax,%edi
 	roll	$5,%eax
@@ -460,7 +460,7 @@ L$aesenclast1:
 	addl	%edi,%ebx
 	addl	32(%rsp),%eax
 	pxor	%xmm6,%xmm2
-	palignr	$8,%xmm0,%xmm8
+.byte	102,68,15,58,15,192,8
 	xorl	%ebp,%esi
 	movl	%ebx,%edi
 	roll	$5,%ebx
@@ -508,7 +508,7 @@ L$aesenclast1:
 	addl	%edi,%ecx
 	addl	48(%rsp),%ebx
 	pxor	%xmm7,%xmm3
-	palignr	$8,%xmm1,%xmm9
+.byte	102,68,15,58,15,201,8
 	xorl	%eax,%esi
 	movl	%ecx,%edi
 	roll	$5,%ecx
@@ -554,7 +554,7 @@ L$aesenclast1:
 	addl	%edi,%edx
 	addl	0(%rsp),%ecx
 	pxor	%xmm0,%xmm4
-	palignr	$8,%xmm2,%xmm10
+.byte	102,68,15,58,15,210,8
 	xorl	%ebx,%esi
 	movl	%edx,%edi
 	roll	$5,%edx
@@ -602,7 +602,7 @@ L$aesenclast1:
 	addl	%edi,%ebp
 	addl	16(%rsp),%edx
 	pxor	%xmm1,%xmm5
-	palignr	$8,%xmm3,%xmm8
+.byte	102,68,15,58,15,195,8
 	xorl	%ecx,%esi
 	movl	%ebp,%edi
 	roll	$5,%ebp
@@ -666,7 +666,7 @@ L$aesenclast2:
 	aesenc	%xmm14,%xmm11
 	movups	32(%r15),%xmm15
 	pxor	%xmm2,%xmm6
-	palignr	$8,%xmm4,%xmm9
+.byte	102,68,15,58,15,204,8
 	xorl	%edx,%ecx
 	addl	32(%rsp),%ebp
 	andl	%edx,%edi
@@ -730,7 +730,7 @@ L$aesenclast2:
 	addl	%ecx,%ebx
 	movl	%edx,%edi
 	pxor	%xmm3,%xmm7
-	palignr	$8,%xmm5,%xmm10
+.byte	102,68,15,58,15,213,8
 	xorl	%ebp,%edx
 	addl	48(%rsp),%eax
 	andl	%ebp,%edi
@@ -794,7 +794,7 @@ L$aesenclast2:
 	addl	%edx,%ecx
 	movl	%ebp,%edi
 	pxor	%xmm4,%xmm0
-	palignr	$8,%xmm6,%xmm8
+.byte	102,68,15,58,15,198,8
 	xorl	%eax,%ebp
 	addl	0(%rsp),%ebx
 	andl	%eax,%edi
@@ -860,7 +860,7 @@ L$aesenclast2:
 	addl	%ebp,%edx
 	movl	%eax,%edi
 	pxor	%xmm5,%xmm1
-	palignr	$8,%xmm7,%xmm9
+.byte	102,68,15,58,15,207,8
 	xorl	%ebx,%eax
 	addl	16(%rsp),%ecx
 	andl	%ebx,%edi
@@ -936,7 +936,7 @@ L$aesenclast3:
 	addl	%eax,%ebp
 	movl	%ebx,%edi
 	pxor	%xmm6,%xmm2
-	palignr	$8,%xmm0,%xmm10
+.byte	102,68,15,58,15,208,8
 	xorl	%ecx,%ebx
 	addl	32(%rsp),%edx
 	andl	%ecx,%edi
@@ -1006,7 +1006,7 @@ L$aesenclast3:
 	aesenc	%xmm14,%xmm11
 	movups	64(%r15),%xmm15
 	pxor	%xmm7,%xmm3
-	palignr	$8,%xmm1,%xmm8
+.byte	102,68,15,58,15,193,8
 	xorl	%edx,%esi
 	movl	%eax,%edi
 	roll	$5,%eax
@@ -1095,11 +1095,11 @@ L$aesenclast3:
 	movdqu	16(%r10),%xmm1
 	movdqu	32(%r10),%xmm2
 	movdqu	48(%r10),%xmm3
-	pshufb	%xmm6,%xmm0
+.byte	102,15,56,0,198
 	addq	$64,%r10
 	addl	16(%rsp),%ebx
 	xorl	%eax,%esi
-	pshufb	%xmm6,%xmm1
+.byte	102,15,56,0,206
 	movl	%ecx,%edi
 	roll	$5,%ecx
 	paddd	%xmm9,%xmm0
@@ -1137,7 +1137,7 @@ L$aesenclast3:
 	addl	%edi,%edx
 	addl	32(%rsp),%ecx
 	xorl	%ebx,%esi
-	pshufb	%xmm6,%xmm2
+.byte	102,15,56,0,214
 	movl	%edx,%edi
 	roll	$5,%edx
 	paddd	%xmm9,%xmm1
@@ -1177,7 +1177,7 @@ L$aesenclast3:
 	addl	%edi,%ebp
 	addl	48(%rsp),%edx
 	xorl	%ecx,%esi
-	pshufb	%xmm6,%xmm3
+.byte	102,15,56,0,222
 	movl	%ebp,%edi
 	roll	$5,%ebp
 	paddd	%xmm9,%xmm2

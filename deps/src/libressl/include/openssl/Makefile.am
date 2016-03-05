@@ -25,7 +25,6 @@ opensslinclude_HEADERS += dh.h
 opensslinclude_HEADERS += dsa.h
 opensslinclude_HEADERS += dso.h
 opensslinclude_HEADERS += dtls1.h
-opensslinclude_HEADERS += e_os2.h
 opensslinclude_HEADERS += ec.h
 opensslinclude_HEADERS += ecdh.h
 opensslinclude_HEADERS += ecdsa.h

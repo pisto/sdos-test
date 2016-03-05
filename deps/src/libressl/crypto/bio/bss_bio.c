@@ -1,4 +1,4 @@
-/* $OpenBSD$ */
+/* $OpenBSD: bss_bio.c,v 1.21 2015/10/30 15:45:57 miod Exp $ */
 /* ====================================================================
  * Copyright (c) 1998-2003 The OpenSSL Project.  All rights reserved.
  *
@@ -78,6 +78,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -499,10 +500,8 @@ bio_ctrl(BIO *bio, int cmd, long num, void *ptr)
 			size_t new_size = num;
 
 			if (b->size != new_size) {
-				if (b->buf) {
-					free(b->buf);
-					b->buf = NULL;
-				}
+				free(b->buf);
+				b->buf = NULL;
 				b->size = new_size;
 			}
 			ret = 1;

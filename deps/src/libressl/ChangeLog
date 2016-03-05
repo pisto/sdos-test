@@ -28,7 +28,44 @@ history is also available from Git.
 
 LibreSSL Portable Release Notes:
 
-2.2.5 - Reliability Update
+2.3.2 - Compatibility and Reliability fixes
+
+	* Changed format of LIBRESSL_VERSION_NUMBER to match that of
+	  OPENSSL_VERSION_NUMBER, see:
+	  https://wiki.openssl.org/index.php/Manual:OPENSSL_VERSION_NUMBER(3)
+
+	* Added EVP_aead_chacha20_poly1305_ietf() which matches the AEAD
+	  construction introduced in RFC 7539, which is different than that
+	  already used in TLS with EVP_aead_chacha20_poly1305()
+
+	* Avoid a potential undefined C99+ behavior due to shift overflow in
+	  AES_decrypt, reported by Pascal Cuoq <cuoq at trust-in-soft.com>
+
+	* More man pages converted from pod to mdoc format
+
+	* Added COMODO RSA Certification Authority and QuoVadis
+	  root certificates to cert.pem
+
+	* Removed Remove "C=US, O=VeriSign, Inc., OU=Class 3 Public Primary Certification
+	  Authority" (serial 3c:91:31:cb:1f:f6:d0:1b:0e:9a:b8:d0:44:bf:12:be) root
+	  certificate from cert.pem
+
+	* Added support for building nc(1) on Solaris
+
+	* Fixed GCC 5.x+ preprocessor checks, reported by Ruslan Babayev
+
+	* Improved console handling with openssl(1) on Windows
+
+	* Ensure the network stack is enabled on Windows when running
+	  tls_init()
+
+	* Fixed incorrect TLS certificate loading by nc(1)
+
+	* Added support for Solaris 11.3's getentropy(2) system call
+
+	* Enabled support for using NetBSD 7.0's arc4random(3) implementation
+
+	* Deprecated the SSL_OP_SINGLE_DH_USE flag by disabling its effect
 
 	* Fixes from OpenSSL 1.0.1q
 	 - CVE-2015-3194 - NULL pointer dereference in client side certificate
@@ -43,16 +80,95 @@ LibreSSL Portable Release Notes:
 
 	 See https://marc.info/?l=openbsd-announce&m=144925068504102
 
-2.2.4 - Build and bug fixes
+2.3.1 - ASN.1 and time handling cleanups
 
-	* Backported build fixes for CMake on Windows, OSX and Linux
+	* ASN.1 cleanups and RFC5280 compliance fixes.
 
-	* Fixes for a memory leak and out-of-bounds access in OBJ_obj2txt
-	  reported by Qualys Security.
-	 - CVE-2015-5333 - memory leak in OBJ_obj2txt
-	 - CVE-2015-5334 - 1-byte buffer overflow in OBJ_obj2txt
+	* Time representations switched from 'unsigned long' to 'time_t'. LibreSSL
+	  now checks if the host OS supports 64-bit time_t.
 
-	 See http://www.openwall.com/lists/oss-security/2015/10/16/1
+	* Fixed a leak in SSL_new in the error path.
+
+	* Support always extracting the peer cipher and version with libtls.
+
+	* Added ability to check certificate validity times with libtls,
+	  tls_peer_cert_notbefore and tls_peer_cert_notafter.
+
+	* Changed tls_connect_servername to use the first address that resolves with
+	  getaddrinfo().
+
+	* Remove broken conditional EVP_CHECK_DES_KEY code (non-functional since
+	  initial commit in 2004).
+
+	* Fixed a memory leak and out-of-bounds access in OBJ_obj2txt, reported
+	  by Qualys Security.
+
+	* Fixed an up-to 7 byte overflow in RC4 when len is not a multiple of
+	  sizeof(RC4_CHUNK), reported by Pascal Cuoq <cuoq at trust-in-soft.com>.
+
+	* Reject too small bits value in BN_generate_prime_ex(), so that it does
+	  not risk becoming negative in probable_prime_dh_safe(), reported by
+		Franck Denis.
+
+	* Enable nc(1) builds on more platforms.
+
+2.3.0 - SSLv3 removed, libtls API changes, portability improvements
+
+	* SSLv3 is now permanently removed from the tree.
+
+	* The libtls API is changed from the 2.2.x series.
+
+	  The read/write functions work correctly with external event
+	  libraries.  See the tls_init man page for examples of using libtls
+	  correctly in asynchronous mode.
+
+	  Client-side verification is now supported, with the client supplying
+	  the certificate to the server.
+
+	  Also, when using tls_connect_fds, tls_connect_socket or
+	  tls_accept_fds, libtls no longer implicitly closes the passed in
+	  sockets. The caller is responsible for closing them in this case.
+
+	* When loading a DSA key from an raw (without DH parameters) ASN.1
+	  serialization, perform some consistency checks on its `p' and `q'
+	  values, and return an error if the checks failed.
+
+	  Thanks for Georgi Guninski (guninski at guninski dot com) for
+	  mentioning the possibility of a weak (non prime) q value and
+	  providing a test case.
+
+	  See
+	  https://cpunks.org/pipermail/cypherpunks/2015-September/009007.html
+	  for a longer discussion.
+
+	* Fixed a bug in ECDH_compute_key that can lead to silent truncation
+	  of the result key without error. A coding error could cause software
+	  to use much shorter keys than intended.
+
+	* Removed support for DTLS_BAD_VER. Pre-DTLSv1 implementations are no
+	  longer supported.
+
+	* The engine command and parameters are removed from the openssl(1).
+	  Previous releases removed dynamic and builtin engine support
+	  already.
+
+	* SHA-0 is removed, which was withdrawn shortly after publication 20
+	  years ago.
+
+	* Added Certplus CA root certificate to the default cert.pem file.
+
+	* New interface OPENSSL_cpu_caps is provided that does not allow
+	  software to inadvertently modify cpu capability flags.
+	  OPENSSL_ia32cap and OPENSSL_ia32cap_loc are removed.
+
+	* The out_len argument of AEAD changed from ssize_t to size_t.
+
+	* Deduplicated DTLS code, sharing bugfixes and improvements with
+	  TLS.
+
+	* Converted 'nc' to use libtls for client and server operations; it is
+	  included in the libressl-portable distribution as an example of how
+	  to use the library.
 
 2.2.3 - Bug fixes, build enhancements
 

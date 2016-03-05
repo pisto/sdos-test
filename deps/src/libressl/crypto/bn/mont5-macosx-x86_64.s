@@ -54,7 +54,7 @@ L$mul_body:
 	leaq	256(%r12),%r12
 	por	%xmm3,%xmm0
 
-	movq	%xmm0,%rbx
+	movd	%xmm0,%rbx
 
 	movq	(%r8),%r8
 	movq	(%rsi),%rax
@@ -117,7 +117,7 @@ L$1st_enter:
 	cmpq	%r9,%r15
 	jl	L$1st
 
-	movq	%xmm0,%rbx
+	movd	%xmm0,%rbx
 
 	addq	%rax,%r13
 	movq	(%rsi),%rax
@@ -200,7 +200,7 @@ L$inner_enter:
 	cmpq	%r9,%r15
 	jl	L$inner
 
-	movq	%xmm0,%rbx
+	movd	%xmm0,%rbx
 
 	addq	%rax,%r13
 	movq	(%rsi),%rax
@@ -312,7 +312,7 @@ L$mul4x_body:
 	leaq	256(%r12),%r12
 	por	%xmm3,%xmm0
 
-	movq	%xmm0,%rbx
+	movd	%xmm0,%rbx
 	movq	(%r8),%r8
 	movq	(%rsi),%rax
 
@@ -459,7 +459,7 @@ L$1st4x:
 	movq	%rdi,-16(%rsp,%r15,8)
 	movq	%rdx,%r13
 
-	movq	%xmm0,%rbx
+	movd	%xmm0,%rbx
 
 	xorq	%rdi,%rdi
 	addq	%r10,%r13
@@ -627,7 +627,7 @@ L$inner4x:
 	movq	%r13,-24(%rsp,%r15,8)
 	movq	%rdx,%r13
 
-	movq	%xmm0,%rbx
+	movd	%xmm0,%rbx
 	movq	%rdi,-16(%rsp,%r15,8)
 
 	xorq	%rdi,%rdi

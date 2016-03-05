@@ -71,7 +71,7 @@ unsigned char *MD4(const unsigned char *d, size_t n, unsigned char *md)
 		return NULL;
 	MD4_Update(&c,d,n);
 	MD4_Final(md,&c);
-	OPENSSL_cleanse(&c,sizeof(c)); /* security consideration */
+	explicit_bzero(&c,sizeof(c));
 	return(md);
 	}
 
