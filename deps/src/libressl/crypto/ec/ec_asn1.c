@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_asn1.c,v 1.15 2015/07/25 14:36:39 jsing Exp $ */
+/* $OpenBSD: ec_asn1.c,v 1.20 2015/10/16 15:12:30 jsing Exp $ */
 /*
  * Written by Nils Larsch for the OpenSSL project.
  */
@@ -232,7 +232,8 @@ const ASN1_ITEM X9_62_PENTANOMIAL_it = {
 	.sname = "X9_62_PENTANOMIAL",
 };
 
-DECLARE_ASN1_ALLOC_FUNCTIONS(X9_62_PENTANOMIAL)
+X9_62_PENTANOMIAL *X9_62_PENTANOMIAL_new(void);
+void X9_62_PENTANOMIAL_free(X9_62_PENTANOMIAL *a);
 
 X9_62_PENTANOMIAL *
 X9_62_PENTANOMIAL_new(void)
@@ -333,7 +334,8 @@ const ASN1_ITEM X9_62_CHARACTERISTIC_TWO_it = {
 	.size = sizeof(X9_62_CHARACTERISTIC_TWO),
 	.sname = "X9_62_CHARACTERISTIC_TWO",
 };
-DECLARE_ASN1_ALLOC_FUNCTIONS(X9_62_CHARACTERISTIC_TWO)
+X9_62_CHARACTERISTIC_TWO *X9_62_CHARACTERISTIC_TWO_new(void);
+void X9_62_CHARACTERISTIC_TWO_free(X9_62_CHARACTERISTIC_TWO *a);
 
 X9_62_CHARACTERISTIC_TWO *
 X9_62_CHARACTERISTIC_TWO_new(void)
@@ -504,7 +506,8 @@ const ASN1_ITEM ECPARAMETERS_it = {
 	.size = sizeof(ECPARAMETERS),
 	.sname = "ECPARAMETERS",
 };
-DECLARE_ASN1_ALLOC_FUNCTIONS(ECPARAMETERS)
+ECPARAMETERS *ECPARAMETERS_new(void);
+void ECPARAMETERS_free(ECPARAMETERS *a);
 
 ECPARAMETERS *
 ECPARAMETERS_new(void)
@@ -551,8 +554,11 @@ const ASN1_ITEM ECPKPARAMETERS_it = {
 	.size = sizeof(ECPKPARAMETERS),
 	.sname = "ECPKPARAMETERS",
 };
-DECLARE_ASN1_FUNCTIONS_const(ECPKPARAMETERS)
-DECLARE_ASN1_ENCODE_FUNCTIONS_const(ECPKPARAMETERS, ECPKPARAMETERS)
+
+ECPKPARAMETERS *ECPKPARAMETERS_new(void);
+void ECPKPARAMETERS_free(ECPKPARAMETERS *a);
+ECPKPARAMETERS *d2i_ECPKPARAMETERS(ECPKPARAMETERS **a, const unsigned char **in, long len);
+int i2d_ECPKPARAMETERS(const ECPKPARAMETERS *a, unsigned char **out);
 
 ECPKPARAMETERS *
 d2i_ECPKPARAMETERS(ECPKPARAMETERS **a, const unsigned char **in, long len)
@@ -619,8 +625,11 @@ const ASN1_ITEM EC_PRIVATEKEY_it = {
 	.size = sizeof(EC_PRIVATEKEY),
 	.sname = "EC_PRIVATEKEY",
 };
-DECLARE_ASN1_FUNCTIONS_const(EC_PRIVATEKEY)
-DECLARE_ASN1_ENCODE_FUNCTIONS_const(EC_PRIVATEKEY, EC_PRIVATEKEY)
+
+EC_PRIVATEKEY *EC_PRIVATEKEY_new(void);
+void EC_PRIVATEKEY_free(EC_PRIVATEKEY *a);
+EC_PRIVATEKEY *d2i_EC_PRIVATEKEY(EC_PRIVATEKEY **a, const unsigned char **in, long len);
+int i2d_EC_PRIVATEKEY(const EC_PRIVATEKEY *a, unsigned char **out);
 
 EC_PRIVATEKEY *
 d2i_EC_PRIVATEKEY(EC_PRIVATEKEY **a, const unsigned char **in, long len)
@@ -1367,8 +1376,8 @@ d2i_ECPrivateKey(EC_KEY ** a, const unsigned char **in, long len)
 
 	if (priv_key->privateKey) {
 		ret->priv_key = BN_bin2bn(
-		    M_ASN1_STRING_data(priv_key->privateKey),
-		    M_ASN1_STRING_length(priv_key->privateKey),
+		    ASN1_STRING_data(priv_key->privateKey),
+		    ASN1_STRING_length(priv_key->privateKey),
 		    ret->priv_key);
 		if (ret->priv_key == NULL) {
 			ECerr(EC_F_D2I_ECPRIVATEKEY,
@@ -1391,8 +1400,8 @@ d2i_ECPrivateKey(EC_KEY ** a, const unsigned char **in, long len)
 			ECerr(EC_F_D2I_ECPRIVATEKEY, ERR_R_EC_LIB);
 			goto err;
 		}
-		pub_oct = M_ASN1_STRING_data(priv_key->publicKey);
-		pub_oct_len = M_ASN1_STRING_length(priv_key->publicKey);
+		pub_oct = ASN1_STRING_data(priv_key->publicKey);
+		pub_oct_len = ASN1_STRING_length(priv_key->publicKey);
 		/* save the point conversion form */
 		ret->conv_form = (point_conversion_form_t) (pub_oct[0] & ~0x01);
 		if (!EC_POINT_oct2point(ret->group, ret->pub_key,
@@ -1459,7 +1468,7 @@ i2d_ECPrivateKey(EC_KEY * a, unsigned char **out)
 		}
 	}
 	if (!(a->enc_flag & EC_PKEY_NO_PUBKEY) && a->pub_key != NULL) {
-		priv_key->publicKey = M_ASN1_BIT_STRING_new();
+		priv_key->publicKey = ASN1_BIT_STRING_new();
 		if (priv_key->publicKey == NULL) {
 			ECerr(EC_F_I2D_ECPRIVATEKEY,
 			    ERR_R_MALLOC_FAILURE);

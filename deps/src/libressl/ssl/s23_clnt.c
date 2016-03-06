@@ -1,4 +1,4 @@
-/* $OpenBSD: s23_clnt.c,v 1.39 2015/07/19 06:31:32 doug Exp $ */
+/* $OpenBSD: s23_clnt.c,v 1.45 2015/09/11 14:39:05 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -117,95 +117,8 @@
 #include <openssl/evp.h>
 #include <openssl/objects.h>
 
-static const SSL_METHOD *ssl23_get_client_method(int ver);
 static int ssl23_client_hello(SSL *s);
 static int ssl23_get_server_hello(SSL *s);
-static const SSL_METHOD *tls_any_get_client_method(int ver);
-
-const SSL_METHOD SSLv23_client_method_data = {
-	.version = TLS1_2_VERSION,
-	.ssl_new = tls1_new,
-	.ssl_clear = tls1_clear,
-	.ssl_free = tls1_free,
-	.ssl_accept = ssl_undefined_function,
-	.ssl_connect = ssl23_connect,
-	.ssl_read = ssl23_read,
-	.ssl_peek = ssl23_peek,
-	.ssl_write = ssl23_write,
-	.ssl_shutdown = ssl_undefined_function,
-	.ssl_renegotiate = ssl_undefined_function,
-	.ssl_renegotiate_check = ssl_ok,
-	.ssl_get_message = ssl3_get_message,
-	.ssl_read_bytes = ssl3_read_bytes,
-	.ssl_write_bytes = ssl3_write_bytes,
-	.ssl_dispatch_alert = ssl3_dispatch_alert,
-	.ssl_ctrl = ssl3_ctrl,
-	.ssl_ctx_ctrl = ssl3_ctx_ctrl,
-	.get_cipher_by_char = ssl3_get_cipher_by_char,
-	.put_cipher_by_char = ssl3_put_cipher_by_char,
-	.ssl_pending = ssl_undefined_const_function,
-	.num_ciphers = ssl3_num_ciphers,
-	.get_cipher = ssl3_get_cipher,
-	.get_ssl_method = ssl23_get_client_method,
-	.get_timeout = ssl23_default_timeout,
-	.ssl3_enc = &ssl3_undef_enc_method,
-	.ssl_version = ssl_undefined_void_function,
-	.ssl_callback_ctrl = ssl3_callback_ctrl,
-	.ssl_ctx_callback_ctrl = ssl3_ctx_callback_ctrl,
-};
-
-const SSL_METHOD TLS_client_method_data = {
-	.version = TLS1_2_VERSION,
-	.ssl_new = tls1_new,
-	.ssl_clear = tls1_clear,
-	.ssl_free = tls1_free,
-	.ssl_accept = ssl_undefined_function,
-	.ssl_connect = tls_any_connect,
-	.ssl_read = ssl23_read,
-	.ssl_peek = ssl23_peek,
-	.ssl_write = ssl23_write,
-	.ssl_shutdown = ssl_undefined_function,
-	.ssl_renegotiate = ssl_undefined_function,
-	.ssl_renegotiate_check = ssl_ok,
-	.ssl_get_message = ssl3_get_message,
-	.ssl_read_bytes = ssl3_read_bytes,
-	.ssl_write_bytes = ssl3_write_bytes,
-	.ssl_dispatch_alert = ssl3_dispatch_alert,
-	.ssl_ctrl = ssl3_ctrl,
-	.ssl_ctx_ctrl = ssl3_ctx_ctrl,
-	.get_cipher_by_char = ssl3_get_cipher_by_char,
-	.put_cipher_by_char = ssl3_put_cipher_by_char,
-	.ssl_pending = ssl_undefined_const_function,
-	.num_ciphers = ssl3_num_ciphers,
-	.get_cipher = ssl3_get_cipher,
-	.get_ssl_method = tls_any_get_client_method,
-	.get_timeout = ssl23_default_timeout,
-	.ssl3_enc = &ssl3_undef_enc_method,
-	.ssl_version = ssl_undefined_void_function,
-	.ssl_callback_ctrl = ssl3_callback_ctrl,
-	.ssl_ctx_callback_ctrl = ssl3_ctx_callback_ctrl,
-};
-
-
-const SSL_METHOD *
-SSLv23_client_method(void)
-{
-	return &SSLv23_client_method_data;
-}
-
-static const SSL_METHOD *
-ssl23_get_client_method(int ver)
-{
-	if (ver == SSL3_VERSION)
-		return (SSLv3_client_method());
-	if (ver == TLS1_VERSION)
-		return (TLSv1_client_method());
-	if (ver == TLS1_1_VERSION)
-		return (TLSv1_1_client_method());
-	if (ver == TLS1_2_VERSION)
-		return (TLSv1_2_client_method());
-	return (NULL);
-}
 
 int
 ssl23_connect(SSL *s)
@@ -255,7 +168,7 @@ ssl23_connect(SSL *s)
 				ret = -1;
 				goto end;
 			}
-			if (!ssl3_init_finished_mac(s)) {
+			if (!tls1_init_finished_mac(s)) {
 				ret = -1;
 				goto end;
 			}
@@ -331,7 +244,7 @@ ssl23_client_hello(SSL *s)
 	 * TLS1>=1, it would be insufficient to pass SSL_NO_TLSv1, the
 	 * answer is SSL_OP_NO_TLSv1|SSL_OP_NO_SSLv3|SSL_OP_NO_SSLv2.
 	 */
-	mask = SSL_OP_NO_TLSv1_1|SSL_OP_NO_TLSv1|SSL_OP_NO_SSLv3;
+	mask = SSL_OP_NO_TLSv1_1|SSL_OP_NO_TLSv1;
 	version = TLS1_2_VERSION;
 
 	if ((options & SSL_OP_NO_TLSv1_2) && (options & mask) != mask)
@@ -340,9 +253,6 @@ ssl23_client_hello(SSL *s)
 	if ((options & SSL_OP_NO_TLSv1_1) && (options & mask) != mask)
 		version = TLS1_VERSION;
 	mask &= ~SSL_OP_NO_TLSv1;
-	if ((options & SSL_OP_NO_TLSv1) && (options & mask) != mask)
-		version = SSL3_VERSION;
-	mask &= ~SSL_OP_NO_SSLv3;
 
 	buf = (unsigned char *)s->init_buf->data;
 	if (s->state == SSL23_ST_CW_CLNT_HELLO_A) {
@@ -357,11 +267,9 @@ ssl23_client_hello(SSL *s)
 		} else if (version == TLS1_VERSION) {
 			version_major = TLS1_VERSION_MAJOR;
 			version_minor = TLS1_VERSION_MINOR;
-		} else if (version == SSL3_VERSION) {
-			version_major = SSL3_VERSION_MAJOR;
-			version_minor = SSL3_VERSION_MINOR;
 		} else {
-			SSLerr(SSL_F_SSL23_CLIENT_HELLO, SSL_R_NO_PROTOCOLS_AVAILABLE);
+			SSLerr(SSL_F_SSL23_CLIENT_HELLO,
+			    SSL_R_NO_PROTOCOLS_AVAILABLE);
 			return (-1);
 		}
 
@@ -373,7 +281,7 @@ ssl23_client_hello(SSL *s)
 		 * Do the record header (5 bytes) and handshake
 		 * message header (4 bytes) last
 		 */
-		d = p = &(buf[9]);
+		d = p = &(buf[SSL3_RT_HEADER_LENGTH + SSL3_HM_HEADER_LENGTH]);
 
 		*(p++) = version_major;
 		*(p++) = version_minor;
@@ -401,11 +309,6 @@ ssl23_client_hello(SSL *s)
 		*(p++) = 0;
 
 		/* TLS extensions*/
-		if (ssl_prepare_clienthello_tlsext(s) <= 0) {
-			SSLerr(SSL_F_SSL23_CLIENT_HELLO,
-			    SSL_R_CLIENTHELLO_TLSEXT);
-			return -1;
-		}
 		if ((p = ssl_add_clienthello_tlsext(s, p,
 		    buf + SSL3_RT_MAX_PLAIN_LENGTH)) == NULL) {
 			SSLerr(SSL_F_SSL23_CLIENT_HELLO, ERR_R_INTERNAL_ERROR);
@@ -415,7 +318,7 @@ ssl23_client_hello(SSL *s)
 		l = p - d;
 
 		/* fill in 4-byte handshake header */
-		d = &(buf[5]);
+		d = &(buf[SSL3_RT_HEADER_LENGTH]);
 		*(d++) = SSL3_MT_CLIENT_HELLO;
 		l2n3(l, d);
 
@@ -445,7 +348,8 @@ ssl23_client_hello(SSL *s)
 		s->init_num = p - buf;
 		s->init_off = 0;
 
-		ssl3_finish_mac(s, &(buf[5]), s->init_num - 5);
+		tls1_finish_mac(s, &(buf[SSL3_RT_HEADER_LENGTH]),
+		    s->init_num - SSL3_RT_HEADER_LENGTH);
 
 		s->state = SSL23_ST_CW_CLNT_HELLO_B;
 		s->init_off = 0;
@@ -494,11 +398,7 @@ ssl23_get_server_hello(SSL *s)
 	    (p[0] == SSL3_RT_ALERT && p[3] == 0 && p[4] == 2))) {
 		/* we have sslv3 or tls1 (server hello or alert) */
 
-		if ((p[2] == SSL3_VERSION_MINOR) &&
-		    !(s->options & SSL_OP_NO_SSLv3)) {
-			s->version = SSL3_VERSION;
-			s->method = SSLv3_client_method();
-		} else if ((p[2] == TLS1_VERSION_MINOR) &&
+		if ((p[2] == TLS1_VERSION_MINOR) &&
 		    !(s->options & SSL_OP_NO_TLSv1)) {
 			s->version = TLS1_VERSION;
 			s->method = TLSv1_client_method();
@@ -577,34 +477,4 @@ ssl23_get_server_hello(SSL *s)
 	return (SSL_connect(s));
 err:
 	return (-1);
-}
-
-const SSL_METHOD *
-TLS_client_method(void)
-{
-	return &TLS_client_method_data;
-}
-
-static const SSL_METHOD *
-tls_any_get_client_method(int ver)
-{
-	if (ver == SSL3_VERSION)
-		return (NULL);
-	else
-		return ssl23_get_client_method(ver);
-}
-
-int
-tls_any_connect(SSL *s)
-{
-	int ret;
-	unsigned long old_options;
-
-	old_options = s->options;
-
-	s->options |= SSL_OP_NO_SSLv3;
-	ret = ssl23_connect(s);
-	s->options = old_options;
-
-	return ret;
 }

@@ -3,11 +3,15 @@ include $(top_srcdir)/Makefile.am.common
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/modes
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/asn1
 AM_CPPFLAGS += -I $(top_srcdir)/ssl
-AM_CPPFLAGS += -I $(top_srcdir)/apps
+AM_CPPFLAGS += -I $(top_srcdir)/apps/openssl
+AM_CPPFLAGS += -I $(top_srcdir)/apps/openssl/compat
 
 LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
 LDADD += $(top_builddir)/ssl/libssl.la
 LDADD += $(top_builddir)/crypto/libcrypto.la
+LDADD += $(top_builddir)/tls/libtls.la
+
+TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/tap-driver.sh
 
 TESTS =
 check_PROGRAMS =
@@ -39,6 +43,11 @@ EXTRA_DIST += arc4randomforktest.sh
 TESTS += asn1test
 check_PROGRAMS += asn1test
 asn1test_SOURCES = asn1test.c
+
+# asn1time
+TESTS += asn1time
+check_PROGRAMS += asn1time
+asn1time_SOURCES = asn1time.c
 
 # base64test
 TESTS += base64test
@@ -88,6 +97,11 @@ noinst_HEADERS = tests.h
 TESTS += cipherstest
 check_PROGRAMS += cipherstest
 cipherstest_SOURCES = cipherstest.c
+
+# clienttest
+TESTS += clienttest
+check_PROGRAMS += clienttest
+clienttest_SOURCES = clienttest.c
 
 # cts128test
 TESTS += cts128test
@@ -208,10 +222,11 @@ pbkdf2_SOURCES = pbkdf2.c
 # pidwraptest relies on an OS-specific way to give out pids and is generally
 # awkward on systems with slow fork
 if ENABLE_EXTRATESTS
-TESTS += pidwraptest
+TESTS += pidwraptest.sh
 check_PROGRAMS += pidwraptest
 pidwraptest_SOURCES = pidwraptest.c
 endif
+EXTRA_DIST += pidwraptest.sh
 
 # pkcs7test
 TESTS += pkcs7test
@@ -245,6 +260,16 @@ TESTS += rc4test
 check_PROGRAMS += rc4test
 rc4test_SOURCES = rc4test.c
 
+# rfc5280time
+check_PROGRAMS += rfc5280time
+rfc5280time_SOURCES = rfc5280time.c
+if SMALL_TIME_T
+TESTS += rfc5280time_small.test
+else
+TESTS += rfc5280time
+endif
+EXTRA_DIST += rfc5280time_small.test
+
 # rmdtest
 TESTS += rmdtest
 check_PROGRAMS += rmdtest
@@ -264,11 +289,6 @@ sha256test_SOURCES = sha256test.c
 TESTS += sha512test
 check_PROGRAMS += sha512test
 sha512test_SOURCES = sha512test.c
-
-# shatest
-TESTS += shatest
-check_PROGRAMS += shatest
-shatest_SOURCES = shatest.c
 
 # ssltest
 TESTS += ssltest.sh
@@ -300,3 +320,7 @@ TESTS += utf8test
 check_PROGRAMS += utf8test
 utf8test_SOURCES = utf8test.c
 
+# verifytest
+TESTS += verifytest
+check_PROGRAMS += verifytest
+verifytest_SOURCES = verifytest.c

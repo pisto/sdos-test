@@ -133,7 +133,7 @@
 .\" ========================================================================
 .\"
 .IX Title "EVP_BytesToKey 3"
-.TH EVP_BytesToKey 3 "2015-12-05" "LibreSSL " "LibreSSL"
+.TH EVP_BytesToKey 3 "2016-01-27" "LibreSSL " "LibreSSL"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -165,7 +165,7 @@ A typical application of this function is to derive keying material for an
 encryption algorithm from a password in the \fBdata\fR parameter.
 .PP
 Increasing the \fBcount\fR parameter slows down the algorithm which makes it
-harder for an attacker to peform a brute force attack using a large number
+harder for an attacker to perform a brute force attack using a large number
 of candidate passwords.
 .PP
 If the total key and \s-1IV\s0 length is less than the digest length and
@@ -183,7 +183,7 @@ enough data is available for the key and \s-1IV.\s0 D_i is defined as:
 \&        D_i = HASH^count(D_(i\-1) || data || salt)
 .Ve
 .PP
-where || denotes concatentaion, D_0 is empty, \s-1HASH\s0 is the digest
+where || denotes concatenation, D_0 is empty, \s-1HASH\s0 is the digest
 algorithm in use, HASH^1(data) is simply \s-1HASH\s0(data), HASH^2(data)
 is \s-1HASH\s0(\s-1HASH\s0(data)) and so on.
 .PP

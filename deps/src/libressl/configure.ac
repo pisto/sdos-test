@@ -49,10 +49,10 @@ AM_CONDITIONAL([BUILD_CERTHASH], [test "x$ac_cv_func_symlink" = xyes])
 AC_CHECK_FUNC([funopen])
 
 CHECK_LIBC_COMPAT
-CHECK_LIBC_CRYPTO_COMPAT
+CHECK_SYSCALL_COMPAT
+CHECK_CRYPTO_COMPAT
 CHECK_VA_COPY
-
-AC_CHECK_HEADERS([err.h])
+CHECK_B64_NTOP
 
 AC_ARG_WITH([openssldir],
 	AS_HELP_STRING([--with-openssldir],
@@ -86,6 +86,10 @@ case $host_cpu in
 		AS_IF([test "x$BSWAP4" = "xyes"],,
 		    CPPFLAGS="$CPPFLAGS -D__STRICT_ALIGNMENT")
 		;;
+	*amd64*)
+		host_cpu=x86_64
+		;;
+
 esac
 
 AC_MSG_CHECKING([if .gnu.warning accepts long strings])
@@ -110,6 +114,9 @@ AM_CONDITIONAL([HOST_ASM_ELF_X86_64],
 AM_CONDITIONAL([HOST_ASM_MACOSX_X86_64],
     [test "x$HOST_ABI" = "xmacosx" -a "$host_cpu" = "x86_64" -a "x$enable_asm" != "xno"])
 
+# Check if time_t is sized correctly
+AC_CHECK_SIZEOF([time_t], [time.h])
+
 AC_CONFIG_FILES([
 	Makefile
 	include/Makefile
@@ -119,11 +126,21 @@ AC_CONFIG_FILES([
 	tls/Makefile
 	tests/Makefile
 	apps/Makefile
+	apps/openssl/Makefile
+	apps/nc/Makefile
 	man/Makefile
 	libcrypto.pc
 	libssl.pc
 	libtls.pc
 	openssl.pc
 ])
+
+AM_CONDITIONAL([SMALL_TIME_T], [test "$ac_cv_sizeof_time_t" = "4"])
+if test "$ac_cv_sizeof_time_t" = "4"; then
+    echo " ** Warning, this system is unable to represent times past 2038"
+    echo " ** It will behave incorrectly when handling valid RFC5280 dates"
+fi
+
+AC_REQUIRE_AUX_FILE([tap-driver.sh])
 
 AC_OUTPUT

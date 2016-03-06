@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_lib.c,v 1.17 2015/04/29 00:11:12 doug Exp $ */
+/* $OpenBSD: ec_lib.c,v 1.19 2015/09/10 15:56:25 jsing Exp $ */
 /*
  * Originally written by Bodo Moeller for the OpenSSL project.
  */
@@ -152,10 +152,10 @@ EC_GROUP_clear_free(EC_GROUP * group)
 	BN_clear_free(&group->cofactor);
 
 	if (group->seed) {
-		OPENSSL_cleanse(group->seed, group->seed_len);
+		explicit_bzero(group->seed, group->seed_len);
 		free(group->seed);
 	}
-	OPENSSL_cleanse(group, sizeof *group);
+	explicit_bzero(group, sizeof *group);
 	free(group);
 }
 
@@ -754,7 +754,7 @@ EC_POINT_clear_free(EC_POINT * point)
 		point->meth->point_clear_finish(point);
 	else if (point->meth->point_finish != 0)
 		point->meth->point_finish(point);
-	OPENSSL_cleanse(point, sizeof *point);
+	explicit_bzero(point, sizeof *point);
 	free(point);
 }
 
@@ -1101,4 +1101,20 @@ EC_GROUP_have_precompute_mult(const EC_GROUP * group)
 	else
 		return 0;	/* cannot tell whether precomputation has
 				 * been performed */
+}
+
+EC_KEY *
+ECParameters_dup(EC_KEY *key)
+{
+	unsigned char *p = NULL;
+	EC_KEY *k = NULL;
+	int len;
+
+	if (key == NULL)
+		return (NULL);
+
+	if ((len = i2d_ECParameters(key, &p)) > 0)
+		k = d2i_ECParameters(NULL, (const unsigned char **)&p, len);
+
+	return (k);	
 }

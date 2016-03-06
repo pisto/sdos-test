@@ -1,4 +1,4 @@
-/*	$OpenBSD: explicit_bzero.c,v 1.2 2014/06/10 04:17:37 deraadt Exp $ */
+/*	$OpenBSD: explicit_bzero.c,v 1.3 2014/06/21 02:34:26 matthew Exp $ */
 /*
  * Public domain.
  * Written by Matthew Dempsky.

@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_both.c,v 1.33 2015/07/18 23:00:23 doug Exp $ */
+/* $OpenBSD: d1_both.c,v 1.37 2015/09/11 16:28:37 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -346,8 +346,7 @@ dtls1_do_write(SSL *s, int type)
 				const struct hm_header_st *msg_hdr = &s->d1->w_msg_hdr;
 				int xlen;
 
-				if (frag_off == 0 &&
-				    s->version != DTLS1_BAD_VER) {
+				if (frag_off == 0) {
 					/*
 					 * Reconstruct message header is if it
 					 * is being sent in single fragment
@@ -364,7 +363,7 @@ dtls1_do_write(SSL *s, int type)
 					xlen = ret - DTLS1_HM_HEADER_LENGTH;
 				}
 
-				ssl3_finish_mac(s, p, xlen);
+				tls1_finish_mac(s, p, xlen);
 			}
 
 			if (ret == s->init_num) {
@@ -441,12 +440,11 @@ again:
 	s2n (msg_hdr->seq, p);
 	l2n3(0, p);
 	l2n3(msg_len, p);
-	if (s->version != DTLS1_BAD_VER) {
-		p -= DTLS1_HM_HEADER_LENGTH;
-		msg_len += DTLS1_HM_HEADER_LENGTH;
-	}
 
-	ssl3_finish_mac(s, p, msg_len);
+	p -= DTLS1_HM_HEADER_LENGTH;
+	msg_len += DTLS1_HM_HEADER_LENGTH;
+
+	tls1_finish_mac(s, p, msg_len);
 	if (s->msg_callback)
 		s->msg_callback(0, s->version, SSL3_RT_HANDSHAKE, p, msg_len,
 		    s, s->msg_callback_arg);
@@ -904,54 +902,6 @@ f_err:
 	return (-1);
 }
 
-int
-dtls1_send_finished(SSL *s, int a, int b, const char *sender, int slen)
-{
-	unsigned char *p, *d;
-	int i;
-	unsigned long l;
-
-	if (s->state == a) {
-		d = (unsigned char *)s->init_buf->data;
-		p = &(d[DTLS1_HM_HEADER_LENGTH]);
-
-		i = s->method->ssl3_enc->final_finish_mac(s, sender, slen,
-		    s->s3->tmp.finish_md);
-		s->s3->tmp.finish_md_len = i;
-		memcpy(p, s->s3->tmp.finish_md, i);
-		p += i;
-		l = i;
-
-		/*
-		 * Copy the finished so we can use it for
-		 * renegotiation checks
-		 */
-		if (s->type == SSL_ST_CONNECT) {
-			OPENSSL_assert(i <= EVP_MAX_MD_SIZE);
-			memcpy(s->s3->previous_client_finished,
-			    s->s3->tmp.finish_md, i);
-			s->s3->previous_client_finished_len = i;
-		} else {
-			OPENSSL_assert(i <= EVP_MAX_MD_SIZE);
-			memcpy(s->s3->previous_server_finished,
-			    s->s3->tmp.finish_md, i);
-			s->s3->previous_server_finished_len = i;
-		}
-
-		d = dtls1_set_message_header(s, d, SSL3_MT_FINISHED, l, 0, l);
-		s->init_num = (int)l + DTLS1_HM_HEADER_LENGTH;
-		s->init_off = 0;
-
-		/* buffer the message to handle re-xmits */
-		dtls1_buffer_message(s, 0);
-
-		s->state = b;
-	}
-
-	/* SSL3_ST_SEND_xxxxxx_HELLO_B */
-	return (dtls1_do_write(s, SSL3_RT_HANDSHAKE));
-}
-
 /*
  * for these 2 messages, we need to
  * ssl->enc_read_ctx			re-init
@@ -970,12 +920,6 @@ dtls1_send_change_cipher_spec(SSL *s, int a, int b)
 		*p++=SSL3_MT_CCS;
 		s->d1->handshake_write_seq = s->d1->next_handshake_write_seq;
 		s->init_num = DTLS1_CCS_HEADER_LENGTH;
-
-		if (s->version == DTLS1_BAD_VER) {
-			s->d1->next_handshake_write_seq++;
-			s2n(s->d1->handshake_write_seq, p);
-			s->init_num += 2;
-		}
 
 		s->init_off = 0;
 

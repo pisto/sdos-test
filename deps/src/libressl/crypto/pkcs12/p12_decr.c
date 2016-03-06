@@ -1,4 +1,4 @@
-/* $OpenBSD: p12_decr.c,v 1.14 2015/02/14 12:43:07 miod Exp $ */
+/* $OpenBSD: p12_decr.c,v 1.16 2015/09/10 15:56:25 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -57,6 +57,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 #include <openssl/err.h>
 #include <openssl/pkcs12.h>
@@ -137,7 +138,7 @@ PKCS12_item_decrypt_d2i(X509_ALGOR *algor, const ASN1_ITEM *it,
 	p = out;
 	ret = ASN1_item_d2i(NULL, &p, outlen, it);
 	if (zbuf)
-		OPENSSL_cleanse(out, outlen);
+		explicit_bzero(out, outlen);
 	if (!ret)
 		PKCS12err(PKCS12_F_PKCS12_ITEM_DECRYPT_D2I,
 		    PKCS12_R_DECODE_ERROR);
@@ -158,7 +159,7 @@ PKCS12_item_i2d_encrypt(X509_ALGOR *algor, const ASN1_ITEM *it,
 	unsigned char *in = NULL;
 	int inlen;
 
-	if (!(oct = M_ASN1_OCTET_STRING_new ())) {
+	if (!(oct = ASN1_OCTET_STRING_new ())) {
 		PKCS12err(PKCS12_F_PKCS12_ITEM_I2D_ENCRYPT,
 		    ERR_R_MALLOC_FAILURE);
 		return NULL;
@@ -176,13 +177,13 @@ PKCS12_item_i2d_encrypt(X509_ALGOR *algor, const ASN1_ITEM *it,
 		goto err;
 	}
 	if (zbuf)
-		OPENSSL_cleanse(in, inlen);
+		explicit_bzero(in, inlen);
 	free(in);
 	return oct;
 
 err:
 	free(in);
-	M_ASN1_OCTET_STRING_free(oct);
+	ASN1_OCTET_STRING_free(oct);
 	return NULL;
 }
 

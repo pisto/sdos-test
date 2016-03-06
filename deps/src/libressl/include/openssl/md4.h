@@ -1,4 +1,4 @@
-/* $OpenBSD: md4.h,v 1.13 2014/07/10 22:45:57 jsing Exp $ */
+/* $OpenBSD$ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *

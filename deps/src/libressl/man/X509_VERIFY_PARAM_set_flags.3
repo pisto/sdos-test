@@ -133,7 +133,7 @@
 .\" ========================================================================
 .\"
 .IX Title "X509_VERIFY_PARAM_set_flags 3"
-.TH X509_VERIFY_PARAM_set_flags 3 "2015-12-05" "LibreSSL " "LibreSSL"
+.TH X509_VERIFY_PARAM_set_flags 3 "2016-01-27" "LibreSSL " "LibreSSL"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -239,7 +239,7 @@ certificates and makes the verification strictly apply \fBX509\fR rules.
 \&\fBX509_V_FLAG_ALLOW_PROXY_CERTS\fR enables proxy certificate verification.
 .PP
 \&\fBX509_V_FLAG_POLICY_CHECK\fR enables certificate policy checking, by default
-no policy checking is peformed. Additional information is sent to the
+no policy checking is performed. Additional information is sent to the
 verification callback relating to policy checking.
 .PP
 \&\fBX509_V_FLAG_EXPLICIT_POLICY\fR, \fBX509_V_FLAG_INHIBIT_ANY\fR and
@@ -261,7 +261,7 @@ If \fBX509_V_FLAG_USE_DELTAS\fR ise set delta CRLs (if present) are used to
 determine certificate status. If not set deltas are ignored.
 .PP
 \&\fBX509_V_FLAG_CHECK_SS_SIGNATURE\fR enables checking of the root \s-1CA\s0 self signed
-cerificate signature. By default this check is disabled because it doesn't
+certificate signature. By default this check is disabled because it doesn't
 add any additional security but in some cases applications might want to
 check the signature anyway. A side effect of not checking the root \s-1CA\s0
 signature is that disabled or unsupported message digests on the root \s-1CA\s0

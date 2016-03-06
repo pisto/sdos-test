@@ -1,4 +1,4 @@
-/* $OpenBSD: eng_openssl.c,v 1.9 2014/07/11 08:44:48 jsing Exp $ */
+/* $OpenBSD: eng_openssl.c,v 1.11 2015/08/28 01:06:09 beck Exp $ */
 /* Written by Geoff Thorpe (geoff@geoffthorpe.net) for the OpenSSL
  * project 2000.
  */
@@ -105,7 +105,7 @@
 #undef TEST_ENG_OPENSSL_RC4_P_INIT
 #undef TEST_ENG_OPENSSL_RC4_P_CIPHER
 #endif
-#if defined(OPENSSL_NO_SHA) || defined(OPENSSL_NO_SHA0) || defined(OPENSSL_NO_SHA1)
+#if defined(OPENSSL_NO_SHA) || defined(OPENSSL_NO_SHA1)
 #undef TEST_ENG_OPENSSL_SHA
 #undef TEST_ENG_OPENSSL_SHA_OTHERS
 #undef TEST_ENG_OPENSSL_SHA_P_INIT
@@ -193,7 +193,7 @@ ENGINE_load_openssl(void)
 
 	if (!toadd)
 		return;
-	ENGINE_add(toadd);
+	(void) ENGINE_add(toadd);
 	/* If the "add" worked, it gets a structural reference. So either way,
 	 * we release our just-created reference. */
 	ENGINE_free(toadd);

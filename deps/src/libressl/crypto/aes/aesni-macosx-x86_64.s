@@ -752,7 +752,7 @@ _aesni_ccm64_encrypt_blocks:
 	movdqu	(%r9),%xmm3
 	movdqa	%xmm9,%xmm2
 	movl	%eax,%r10d
-	pshufb	%xmm7,%xmm9
+.byte	102,68,15,56,0,207
 	jmp	L$ccm64_enc_outer
 .p2align	4
 L$ccm64_enc_outer:
@@ -789,7 +789,7 @@ L$ccm64_enc2_loop:
 	movdqa	%xmm9,%xmm2
 	movups	%xmm8,(%rsi)
 	leaq	16(%rsi),%rsi
-	pshufb	%xmm7,%xmm2
+.byte	102,15,56,0,215
 	jnz	L$ccm64_enc_outer
 
 	movups	%xmm3,(%r9)
@@ -808,7 +808,7 @@ _aesni_ccm64_decrypt_blocks:
 	movaps	%xmm9,%xmm2
 	movl	%eax,%r10d
 	movq	%rcx,%r11
-	pshufb	%xmm7,%xmm9
+.byte	102,68,15,56,0,207
 	movups	(%rcx),%xmm0
 	movups	16(%rcx),%xmm1
 	leaq	32(%rcx),%rcx
@@ -831,7 +831,7 @@ L$ccm64_dec_outer:
 	movl	%r10d,%eax
 	movups	%xmm8,(%rsi)
 	leaq	16(%rsi),%rsi
-	pshufb	%xmm7,%xmm2
+.byte	102,15,56,0,215
 
 	subq	$1,%rdx
 	jz	L$ccm64_dec_break
@@ -911,9 +911,9 @@ _aesni_ctr32_encrypt_blocks:
 	incq	%r11
 .byte	102,69,15,58,34,235,2
 	movdqa	%xmm12,-40(%rsp)
-	pshufb	%xmm15,%xmm12
+.byte	102,69,15,56,0,231
 	movdqa	%xmm13,-24(%rsp)
-	pshufb	%xmm15,%xmm13
+.byte	102,69,15,56,0,239
 
 	pshufd	$192,%xmm12,%xmm2
 	pshufd	$128,%xmm12,%xmm3
@@ -991,9 +991,9 @@ L$ctr32_enc_loop6_enter:
 	aesenc	%xmm1,%xmm5
 	movdqa	%xmm13,-24(%rsp)
 	aesenc	%xmm1,%xmm6
-	pshufb	%xmm15,%xmm12
+.byte	102,69,15,56,0,231
 	aesenc	%xmm1,%xmm7
-	pshufb	%xmm15,%xmm13
+.byte	102,69,15,56,0,239
 
 	aesenclast	%xmm0,%xmm2
 	movups	(%rdi),%xmm8

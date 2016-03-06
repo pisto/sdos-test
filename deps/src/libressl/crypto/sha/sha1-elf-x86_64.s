@@ -1317,11 +1317,11 @@ _ssse3_shortcut:
 	movdqu	16(%r9),%xmm1
 	movdqu	32(%r9),%xmm2
 	movdqu	48(%r9),%xmm3
-	pshufb	%xmm6,%xmm0
+.byte	102,15,56,0,198
 	addq	$64,%r9
-	pshufb	%xmm6,%xmm1
-	pshufb	%xmm6,%xmm2
-	pshufb	%xmm6,%xmm3
+.byte	102,15,56,0,206
+.byte	102,15,56,0,214
+.byte	102,15,56,0,222
 	paddd	%xmm9,%xmm0
 	paddd	%xmm9,%xmm1
 	paddd	%xmm9,%xmm2
@@ -1338,7 +1338,7 @@ _ssse3_shortcut:
 	addl	0(%rsp),%ebp
 	xorl	%edx,%ecx
 	movdqa	%xmm3,%xmm8
-	palignr	$8,%xmm0,%xmm4
+.byte	102,15,58,15,224,8
 	movl	%eax,%edi
 	roll	$5,%eax
 	paddd	%xmm3,%xmm9
@@ -1399,7 +1399,7 @@ _ssse3_shortcut:
 	addl	16(%rsp),%eax
 	xorl	%ebp,%edx
 	movdqa	%xmm4,%xmm9
-	palignr	$8,%xmm1,%xmm5
+.byte	102,15,58,15,233,8
 	movl	%ebx,%edi
 	roll	$5,%ebx
 	paddd	%xmm4,%xmm10
@@ -1460,7 +1460,7 @@ _ssse3_shortcut:
 	addl	32(%rsp),%ebx
 	xorl	%eax,%ebp
 	movdqa	%xmm5,%xmm10
-	palignr	$8,%xmm2,%xmm6
+.byte	102,15,58,15,242,8
 	movl	%ecx,%edi
 	roll	$5,%ecx
 	paddd	%xmm5,%xmm8
@@ -1521,7 +1521,7 @@ _ssse3_shortcut:
 	addl	48(%rsp),%ecx
 	xorl	%ebx,%eax
 	movdqa	%xmm6,%xmm8
-	palignr	$8,%xmm3,%xmm7
+.byte	102,15,58,15,251,8
 	movl	%edx,%edi
 	roll	$5,%edx
 	paddd	%xmm6,%xmm9
@@ -1581,7 +1581,7 @@ _ssse3_shortcut:
 	movdqa	%xmm7,%xmm9
 	addl	0(%rsp),%edx
 	pxor	%xmm4,%xmm0
-	palignr	$8,%xmm6,%xmm9
+.byte	102,68,15,58,15,206,8
 	xorl	%ecx,%ebx
 	movl	%ebp,%edi
 	roll	$5,%ebp
@@ -1633,7 +1633,7 @@ _ssse3_shortcut:
 	addl	%edi,%eax
 	addl	16(%rsp),%ebp
 	pxor	%xmm5,%xmm1
-	palignr	$8,%xmm7,%xmm10
+.byte	102,68,15,58,15,215,8
 	xorl	%edx,%esi
 	movl	%eax,%edi
 	roll	$5,%eax
@@ -1677,7 +1677,7 @@ _ssse3_shortcut:
 	addl	%edi,%ebx
 	addl	32(%rsp),%eax
 	pxor	%xmm6,%xmm2
-	palignr	$8,%xmm0,%xmm8
+.byte	102,68,15,58,15,192,8
 	xorl	%ebp,%esi
 	movl	%ebx,%edi
 	roll	$5,%ebx
@@ -1721,7 +1721,7 @@ _ssse3_shortcut:
 	addl	%edi,%ecx
 	addl	48(%rsp),%ebx
 	pxor	%xmm7,%xmm3
-	palignr	$8,%xmm1,%xmm9
+.byte	102,68,15,58,15,201,8
 	xorl	%eax,%esi
 	movl	%ecx,%edi
 	roll	$5,%ecx
@@ -1765,7 +1765,7 @@ _ssse3_shortcut:
 	addl	%edi,%edx
 	addl	0(%rsp),%ecx
 	pxor	%xmm0,%xmm4
-	palignr	$8,%xmm2,%xmm10
+.byte	102,68,15,58,15,210,8
 	xorl	%ebx,%esi
 	movl	%edx,%edi
 	roll	$5,%edx
@@ -1809,7 +1809,7 @@ _ssse3_shortcut:
 	addl	%edi,%ebp
 	addl	16(%rsp),%edx
 	pxor	%xmm1,%xmm5
-	palignr	$8,%xmm3,%xmm8
+.byte	102,68,15,58,15,195,8
 	xorl	%ecx,%esi
 	movl	%ebp,%edi
 	roll	$5,%ebp
@@ -1853,7 +1853,7 @@ _ssse3_shortcut:
 	addl	%edi,%eax
 	movl	%ecx,%edi
 	pxor	%xmm2,%xmm6
-	palignr	$8,%xmm4,%xmm9
+.byte	102,68,15,58,15,204,8
 	xorl	%edx,%ecx
 	addl	32(%rsp),%ebp
 	andl	%edx,%edi
@@ -1913,7 +1913,7 @@ _ssse3_shortcut:
 	addl	%ecx,%ebx
 	movl	%edx,%edi
 	pxor	%xmm3,%xmm7
-	palignr	$8,%xmm5,%xmm10
+.byte	102,68,15,58,15,213,8
 	xorl	%ebp,%edx
 	addl	48(%rsp),%eax
 	andl	%ebp,%edi
@@ -1973,7 +1973,7 @@ _ssse3_shortcut:
 	addl	%edx,%ecx
 	movl	%ebp,%edi
 	pxor	%xmm4,%xmm0
-	palignr	$8,%xmm6,%xmm8
+.byte	102,68,15,58,15,198,8
 	xorl	%eax,%ebp
 	addl	0(%rsp),%ebx
 	andl	%eax,%edi
@@ -2033,7 +2033,7 @@ _ssse3_shortcut:
 	addl	%ebp,%edx
 	movl	%eax,%edi
 	pxor	%xmm5,%xmm1
-	palignr	$8,%xmm7,%xmm9
+.byte	102,68,15,58,15,207,8
 	xorl	%ebx,%eax
 	addl	16(%rsp),%ecx
 	andl	%ebx,%edi
@@ -2093,7 +2093,7 @@ _ssse3_shortcut:
 	addl	%eax,%ebp
 	movl	%ebx,%edi
 	pxor	%xmm6,%xmm2
-	palignr	$8,%xmm0,%xmm10
+.byte	102,68,15,58,15,208,8
 	xorl	%ecx,%ebx
 	addl	32(%rsp),%edx
 	andl	%ecx,%edi
@@ -2153,7 +2153,7 @@ _ssse3_shortcut:
 	addl	%ebx,%eax
 	addl	48(%rsp),%ebp
 	pxor	%xmm7,%xmm3
-	palignr	$8,%xmm1,%xmm8
+.byte	102,68,15,58,15,193,8
 	xorl	%edx,%esi
 	movl	%eax,%edi
 	roll	$5,%eax
@@ -2236,11 +2236,11 @@ _ssse3_shortcut:
 	movdqu	16(%r9),%xmm1
 	movdqu	32(%r9),%xmm2
 	movdqu	48(%r9),%xmm3
-	pshufb	%xmm6,%xmm0
+.byte	102,15,56,0,198
 	addq	$64,%r9
 	addl	16(%rsp),%ebx
 	xorl	%eax,%esi
-	pshufb	%xmm6,%xmm1
+.byte	102,15,56,0,206
 	movl	%ecx,%edi
 	roll	$5,%ecx
 	paddd	%xmm9,%xmm0
@@ -2276,7 +2276,7 @@ _ssse3_shortcut:
 	addl	%edi,%edx
 	addl	32(%rsp),%ecx
 	xorl	%ebx,%esi
-	pshufb	%xmm6,%xmm2
+.byte	102,15,56,0,214
 	movl	%edx,%edi
 	roll	$5,%edx
 	paddd	%xmm9,%xmm1
@@ -2312,7 +2312,7 @@ _ssse3_shortcut:
 	addl	%edi,%ebp
 	addl	48(%rsp),%edx
 	xorl	%ecx,%esi
-	pshufb	%xmm6,%xmm3
+.byte	102,15,56,0,222
 	movl	%ebp,%edi
 	roll	$5,%ebp
 	paddd	%xmm9,%xmm2
