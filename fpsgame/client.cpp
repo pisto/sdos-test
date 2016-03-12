@@ -1160,10 +1160,7 @@ namespace game
         if(totalmillis-lastping>250)
         {
             putint(p, next2collect(N_PING));
-            //NEW
-            putint(p, (int)mod::getsaltedmicroseconds());
-            //NEW END
-            //putint(p, totalmillis);
+            putint(p, totalmillis);
             lastping = totalmillis;
         }
         sendclientpacket(p.finalize(), 1);
@@ -1181,7 +1178,6 @@ namespace game
 
     void sendintro()
     {
-        mod::getsaltedmicroseconds(true); //NEW rand value on each connect
         packetbuf p(MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
         putint(p, next2collect(N_CONNECT));
         sendstring(player1->name, p);
@@ -1923,16 +1919,14 @@ namespace game
             {
                 //NEW
                 DEMORECORDER_SKIP_PACKET_NC;
-                uint usecping = mod::getsaltedmicroseconds(false, (uint)getint(p));
-                if(!usecping) break;
-                float ping = usecping/1000.0f;
+                int ping = totalmillis-getint(p);
                 player1->highresping = (player1->highresping*5.0f+ping)/6.0f;
                 player1->ping = (player1->ping*5+ping)/6;
                 addmsg(N_CLIENTPING, "i", player1->ping);
                 if(mod::demorecorder::demorecord) 
                     mod::demorecorder::self::ping(player1->ping);
                 //NEW END
-                //addmsg(N_CLIENTPING, "i", player1->ping = (player1->ping*5+lastmillis-getint(p))/6);
+                //addmsg(N_CLIENTPING, "i", player1->ping = (player1->ping*5+totalmillis-getint(p))/6);
                 break;
             }
 
