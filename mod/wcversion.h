@@ -5,7 +5,7 @@ extern const char* WCREVISION;
 
 constexpr int WC_VERSION_MAJOR = 0;
 constexpr int WC_VERSION_MINOR = 8;
-constexpr int WC_VERSION_PATCH = 0;
+constexpr int WC_VERSION_PATCH = 1;
 
 #undef major
 #undef minor

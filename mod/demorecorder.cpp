@@ -495,8 +495,12 @@ namespace demorecorder
             uchar buf[64];
             ucharbuf p(buf, sizeof(buf));
 
+            if (!d)
+                d = player1;
+
             putint(p, N_SOUND);
             putint(p, n);
+
             clientmsg(p.buf, p.length(), (fpsent*)d);
         }
 
@@ -621,7 +625,7 @@ namespace demorecorder
 
             putint(p, curpeer ? (int)curpeer->address.host : -1);
             putint(p, curpeer ? (int)curpeer->address.port : -1);
-            sendstring(servinfo, p);
+            sendstring(::servinfo, p);
             putint(p, gamemode);
             sendstring(getclientmap(), p);
             putint(p, 0);
